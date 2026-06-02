@@ -1,15 +1,12 @@
 # ─────────────────────────────────────────────
 # Netlify 배포 설정
-# 정적 사이트 + Netlify Function (auth_key 서버측 주입)
+# 정적 사이트 + Edge Function (auth_key 서버측 주입)
+# Edge Function = Netlify 자체 엣지망 실행 (Lambda IP 차단 우회)
 # ─────────────────────────────────────────────
 
 [build]
   publish = "."
-  functions = "netlify/functions"
-
-# Functions 런타임 (Node 18 → 내장 fetch 사용)
-[functions]
-  node_bundler = "esbuild"
+  edge_functions = "netlify/edge-functions"
 
 # 1) 루트(/) → 대시보드
 [[redirects]]
@@ -17,12 +14,10 @@
   to = "/kbo-dashboard.html"
   status = 200
 
-# 2) /api/* → Netlify Function (auth_key 자동 주입)
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
-  status = 200
-  force = true
+# 2) Edge Function 자동 라우팅
+[[edge_functions]]
+  function = "api"
+  path = "/api/*"
 
 # 3) 보안 헤더
 [[headers]]
