@@ -6,18 +6,20 @@
 
 [build]
   publish = "."
-  edge_functions = "netlify/edge-functions"
 
-# 1) 루트(/) → 대시보드
+# 1) 루트 → 대시보드
 [[redirects]]
   from = "/"
   to = "/kbo-dashboard.html"
   status = 200
 
-# 2) Edge Function 자동 라우팅
-[[edge_functions]]
-  function = "api"
-  path = "/api/*"
+# 2) /api/* 직접 프록시 + auth_key 자동 부착
+#    ※ 키 임시 노출 (연결 검증용). 정상 동작 확인 후 키 숨김 처리
+[[redirects]]
+  from = "/api/*"
+  to = "https://data.psynet.co.kr/data3V1/:splat?auth_key=YlXPJojo8hVs5iFeWfZBRE7SJ8cXOUHF"
+  status = 200
+  force = true
 
 # 3) 보안 헤더
 [[headers]]
