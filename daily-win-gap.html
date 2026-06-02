@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>일간 승차 변화 | KBO (Psynet API)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --border: #e5e7eb;
+    --bg: #ffffff;
+    --text: #111827;
+    --muted: #6b7280;
+    --accent: #ef4444;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; color: var(--text); background: #f9fafb; }
+  .wrap { max-width: 1640px; margin: 24px auto; padding: 0 16px; }
+  .panel {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: var(--shadow); padding: 16px 18px; margin-bottom: 14px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  }
+  .panel label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+  .panel input { font: inherit; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; min-width: 200px; }
+  .panel button {
+    background: var(--accent); color: #fff; border: 0; padding: 8px 16px; border-radius: 6px;
+    font-weight: 600; cursor: pointer;
+  }
+  .panel button:hover { background: #dc2626; }
+  .panel button.secondary { background: #6b7280; }
+  .panel .progress { color: var(--muted); font-size: 13px; margin-left: auto; }
+  .daily-stats-chart-area {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: var(--shadow); padding: 20px 22px 16px;
+  }
+  .chart-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .chart-header .icon { font-size: 18px; }
+  .chart-header h3 { font-size: 16px; font-weight: 700; margin: 0; }
+  .chart-canvas-wrap {
+    position: relative; width: 100%; height: 540px;
+  }
+  .chart-canvas-wrap canvas { width: 100% !important; height: 100% !important; }
+  /* 엔드 로고는 Chart.js 플러그인이 캔버스에 직접 드로잉 */
+  .toggles {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+    margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);
+  }
+  .toggle-all {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1.5px solid var(--accent); color: var(--accent); background: #fff;
+    border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600;
+    cursor: pointer; user-select: none;
+  }
+  .toggle-all:hover { background: #fff1f2; }
+  .team-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1.5px solid var(--border); background: #fff;
+    border-radius: 999px; padding: 6px 12px 6px 6px; font-size: 13px; font-weight: 600;
+    cursor: pointer; user-select: none; transition: all .15s;
+  }
+  .team-toggle img { width: 22px; height: 22px; object-fit: contain; }
+  .team-toggle .bar { width: 18px; height: 3px; border-radius: 2px; }
+  .team-toggle.off { opacity: 0.35; }
+  .team-toggle:hover { border-color: #cbd5e1; }
+  .badge {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:24px; height:24px; border-radius:50%; color:#fff; font-size:10px; font-weight:700;
+  }
+  .src-note { color: var(--muted); font-size: 12px; margin-top: 8px; text-align: right; }
+  .err { color: var(--accent); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel">
+    <label>시작일
+      <input id="startDate" type="date" value="2026-03-28" />
+    </label>
+    <label>종료일
+      <input id="endDate" type="date" />
+    </label>
+    <button id="reload">새로고침</button>
+    <button id="clearCache" class="secondary">캐시 삭제</button>
+    <span class="progress" id="progress">대기 중</span>
+  </div>
+
+  <div class="daily-stats-chart-area">
+    <div class="chart-header">
+      <span class="icon">📈</span>
+      <h3>일간 승차 변화</h3>
+    </div>
+    <div class="chart-canvas-wrap">
+      <canvas id="winGapChart"></canvas>
+    </div>
+    <div class="toggles" id="toggles"></div>
+    <div class="src-note" id="srcNote">데이터 출처: data.psynet.co.kr / GAME_LIST (LEAGUE_ID=11)</div>
+    <div class="err" id="errBox"></div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// KBO 1군 팀 메타 (LEAGUE_ID=11)
+// 색상/순서: KBO 대시보드 원본과 일치
+// ─────────────────────────────────────────────
+const TEAMS = [
+  { id:"1LG", key:"LG",   name:"LG",   color:"#C30452", logo:"https://kbo-dashboard.co.kr/images/teams/lg.png" },
+  { id:"1KT", key:"KT",   name:"KT",   color:"#000000", logo:"https://kbo-dashboard.co.kr/images/teams/kt.png" },
+  { id:"1SS", key:"삼성", name:"삼성", color:"#074CA1", logo:"https://kbo-dashboard.co.kr/images/teams/samsung.png" },
+  { id:"1HT", key:"KIA",  name:"KIA",  color:"#EA0029", logo:"https://kbo-dashboard.co.kr/images/teams/kia.png" },
+  { id:"1HH", key:"한화", name:"한화", color:"#FF6600", logo:"https://kbo-dashboard.co.kr/images/teams/hanwha.png" },
+  { id:"1OB", key:"두산", name:"두산", color:"#131230", logo:"https://kbo-dashboard.co.kr/images/teams/doosan.png" },
+  { id:"1NC", key:"NC",   name:"NC",   color:"#315288", logo:"https://kbo-dashboard.co.kr/images/teams/nc.png" },
+  { id:"1SK", key:"SSG",  name:"SSG",  color:"#CE0E2D", logo:"https://kbo-dashboard.co.kr/images/teams/ssg.png" },
+  { id:"1LT", key:"롯데", name:"롯데", color:"#002955", logo:"https://kbo-dashboard.co.kr/images/teams/lotte.png" },
+  { id:"1WO", key:"키움", name:"키움", color:"#820024", logo:"https://kbo-dashboard.co.kr/images/teams/kiwoom.png" },
+];
+
+// 로컬 프록시(시작.bat 사용 시) 우선, 실패 시 직접 호출(같은 origin일 때만 동작)
+const API_BASES = [
+  "/api/livescore/gameList",                                  // 로컬 Python 프록시 경유
+  "https://data.psynet.co.kr/data3V1/livescore/gameList"      // 직접 호출 (CORS 허용 환경에서만)
+];
+const CACHE_PREFIX = "kbo_gl_v1_";
+
+// ─────────────────────────────────────────────
+// 유틸
+// ─────────────────────────────────────────────
+const pad = n => String(n).padStart(2, "0");
+function ymd(d) { return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`; }
+function ymdSlash(s) { return `${s.slice(4,6)}/${s.slice(6,8)}`; } // "20260328" -> "03/28"
+function todayYMD() { const d=new Date(); return ymd(d); }
+function isoToYMD(iso) { return iso.replaceAll("-",""); }
+
+function setProgress(t) { document.getElementById("progress").textContent = t; }
+function setErr(t) { document.getElementById("errBox").textContent = t||""; }
+
+// ─────────────────────────────────────────────
+// 하루 단위 KBO 1군 경기 결과 조회 (캐시 적용)
+//   완료 경기(STATE=F)만 캐시 — 진행/예정 경기는 즉시성 보장 위해 캐시 X
+// ─────────────────────────────────────────────
+async function fetchDay(dateYMD, allowCacheForToday=false) {
+  const cacheKey = CACHE_PREFIX + dateYMD;
+  const today = todayYMD();
+  const isPast = dateYMD < today;
+
+  if (isPast) {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try { return JSON.parse(cached); } catch(e) {}
+    }
+  }
+
+  const qs = `?search_date=${dateYMD}&compe=baseball`;
+  let j = null, lastErr = null;
+  for (const base of API_BASES) {
+    try {
+      const r = await fetch(base + qs);
+      if (!r.ok) { lastErr = new Error(`HTTP ${r.status}`); continue; }
+      j = await r.json();
+      break;
+    } catch (e) { lastErr = e; }
+  }
+  if (!j) throw new Error(`fetch 실패 @ ${dateYMD}: ${lastErr}`);
+  const all = j?.Data?.list || j?.gameList || [];
+  const kbo = all.filter(g => g.LEAGUE_ID === "11" && g.STATE === "F");
+
+  if (isPast) {
+    try { localStorage.setItem(cacheKey, JSON.stringify(kbo)); } catch(e) {}
+  }
+  return kbo;
+}
+
+// ─────────────────────────────────────────────
+// 일자 순회 → 누적 W/L/D → 일간 승차 산출
+// 승차_T = ((leader_W - T_W) + (T_L - leader_L)) / 2
+//        = ((leader_W - leader_L) - (T_W - T_L)) / 2
+// 리더 = max(W - L)
+// 무승부는 W/L 어디에도 포함 X
+// ─────────────────────────────────────────────
+async function loadSeries(startISO, endISO) {
+  const start = new Date(startISO + "T00:00:00");
+  const end = new Date(endISO + "T00:00:00");
+  if (end < start) throw new Error("종료일이 시작일보다 빠름");
+
+  // 1) 모든 날짜 수집
+  const dates = [];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate()+1)) {
+    dates.push(ymd(d));
+  }
+
+  // 2) 청크 단위로 동시 fetch
+  const CHUNK = 8;
+  const dayGames = {}; // ymd -> games[]
+  for (let i = 0; i < dates.length; i += CHUNK) {
+    const chunk = dates.slice(i, i+CHUNK);
+    setProgress(`불러오는 중 ${Math.min(i+CHUNK, dates.length)}/${dates.length}`);
+    const results = await Promise.all(chunk.map(d => fetchDay(d).catch(e => { console.warn(e); return []; })));
+    chunk.forEach((d, idx) => { dayGames[d] = results[idx]; });
+  }
+
+  // 3) 누적 W/L/D
+  const wl = {};
+  TEAMS.forEach(t => wl[t.id] = { W:0, L:0, D:0 });
+
+  const labels = [];        // "03/28" 형태
+  const seriesById = {};    // teamId -> [gap...]
+  TEAMS.forEach(t => seriesById[t.id] = []);
+
+  for (const dateYMD of dates) {
+    const games = dayGames[dateYMD] || [];
+    if (!games.length) continue; // 경기 없는 날 스킵
+
+    for (const g of games) {
+      const home = g.HOME_TEAM_ID, away = g.AWAY_TEAM_ID;
+      const hs = parseInt(g.HOME_SCORE, 10);
+      const as = parseInt(g.AWAY_SCORE, 10);
+      if (!wl[home] || !wl[away]) continue;
+      if (isNaN(hs) || isNaN(as)) continue;
+      if (hs > as) { wl[home].W++; wl[away].L++; }
+      else if (as > hs) { wl[away].W++; wl[home].L++; }
+      else { wl[home].D++; wl[away].D++; }
+    }
+
+    // 리더: max(W-L)
+    const diffs = TEAMS.map(t => wl[t.id].W - wl[t.id].L);
+    const leaderDiff = Math.max(...diffs);
+
+    labels.push(ymdSlash(dateYMD));
+    TEAMS.forEach(t => {
+      const d = wl[t.id].W - wl[t.id].L;
+      const gap = (leaderDiff - d) / 2;
+      seriesById[t.id].push(gap);
+    });
+  }
+
+  return { labels, seriesById };
+}
+
+// ─────────────────────────────────────────────
+// 팀 로고 프리로드 + 캔버스 드로잉용 이미지 풀
+// ─────────────────────────────────────────────
+const LOGO_IMG = {};
+function preloadLogos() {
+  TEAMS.forEach(t => {
+    const img = new Image();
+    img.onload = () => { LOGO_IMG[t.id] = img; if (chart) chart.draw(); };
+    img.onerror = () => { LOGO_IMG[t.id] = null; };
+    img.src = t.logo;
+  });
+}
+preloadLogos();
+
+// ─────────────────────────────────────────────
+// 차트 끝점 팀 엠블럼 플러그인 (캔버스 직접 드로잉)
+// 겹침 회피: y 좌표 기준 정렬 후 최소 간격 강제
+// ─────────────────────────────────────────────
+const endLogosPlugin = {
+  id: "endLogos",
+  afterDatasetsDraw(chart) {
+    const ctx = chart.ctx;
+    const lastIdx = chart.data.labels.length - 1;
+    if (lastIdx < 0) return;
+
+    const items = [];
+    chart.data.datasets.forEach((ds, i) => {
+      if (!chart.isDatasetVisible(i)) return;
+      const meta = chart.getDatasetMeta(i);
+      const pt = meta.data[lastIdx];
+      if (!pt) return;
+      const team = TEAMS.find(tt => tt.key === ds.label);
+      if (!team) return;
+      items.push({ team, x: pt.x, y: pt.y });
+    });
+
+    // 위→아래 정렬 + 겹침 방지
+    const SIZE = 26, GAP = SIZE * 0.85;
+    items.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < items.length; i++) {
+      if (items[i].y - items[i-1].y < GAP) {
+        items[i].y = items[i-1].y + GAP;
+      }
+    }
+    // 차트 영역 하단 초과 시 위쪽으로 밀어 올림
+    const bottomLimit = chart.chartArea.bottom + SIZE/2;
+    if (items.length && items[items.length-1].y > bottomLimit) {
+      const shift = items[items.length-1].y - bottomLimit;
+      items.forEach(it => { it.y -= shift; });
+    }
+
+    ctx.save();
+    items.forEach(it => {
+      const img = LOGO_IMG[it.team.id];
+      const dx = it.x + 8;
+      const dy = it.y - SIZE/2;
+      if (img && img.complete && img.naturalWidth > 0) {
+        // 원본 종횡비 유지 (contain 방식)
+        const nw = img.naturalWidth, nh = img.naturalHeight;
+        const scale = Math.min(SIZE / nw, SIZE / nh);
+        const dw = nw * scale, dh = nh * scale;
+        ctx.drawImage(img, dx + (SIZE - dw) / 2, dy + (SIZE - dh) / 2, dw, dh);
+      } else {
+        // 폴백: 컬러 원 + 팀 이니셜
+        const cx = dx + SIZE/2, cy = dy + SIZE/2;
+        ctx.fillStyle = it.team.color;
+        ctx.beginPath();
+        ctx.arc(cx, cy, SIZE/2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 10px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(it.team.key.slice(0, 2), cx, cy);
+      }
+    });
+    ctx.restore();
+  }
+};
+
+let chart;
+
+function buildChart(labels, seriesById) {
+  const datasets = TEAMS.map(t => ({
+    label: t.key,
+    data: seriesById[t.id] || [],
+    borderColor: t.color,
+    backgroundColor: t.color + "20",
+    borderWidth: 2,
+    fill: false,
+    tension: 0.2,
+    pointRadius: 2,
+    pointHoverRadius: 4,
+    pointBackgroundColor: t.color,
+    pointBorderColor: t.color,
+    hidden: false,
+  }));
+
+  const ctx = document.getElementById("winGapChart").getContext("2d");
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: "line",
+    data: { labels, datasets },
+    plugins: [endLogosPlugin],
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { left: 10, right: 56, top: 25, bottom: 10 } },
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: "index",
+          intersect: false,
+          itemSort: (a, b) => a.parsed.y - b.parsed.y,
+          callbacks: {
+            title: items => `${items[0].label} 기준`,
+            label: c => {
+              const v = c.parsed.y;
+              const t = v === 0 ? "동률" : `${v}게임차`;
+              return `${c.dataset.label}: ${t}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: "category",
+          ticks: { maxRotation: 45, minRotation: 45, font: { size: 11 }, maxTicksLimit: 120, color: "#666" },
+          grid: { color: "rgba(0,0,0,0.1)" }
+        },
+        y: {
+          reverse: true, beginAtZero: true,
+          title: { display: true, text: "게임차", color: "#666" },
+          ticks: { stepSize: 1, color: "#666", callback: v => v === 0 ? "동률" : `${v}게임차` },
+          grid: { color: "rgba(0,0,0,0.1)" }
+        }
+      },
+      animation: { duration: 400 }
+    }
+  });
+
+  buildToggles();
+}
+
+function buildToggles() {
+  const host = document.getElementById("toggles");
+  host.innerHTML = "";
+  const allBtn = document.createElement("button");
+  allBtn.className = "toggle-all";
+  allBtn.id = "toggleAll";
+  host.appendChild(allBtn);
+
+  TEAMS.forEach((t, idx) => {
+    const btn = document.createElement("button");
+    btn.className = "team-toggle";
+    btn.innerHTML = `
+      <img src="${t.logo}" alt="${t.name}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'badge',style:'background:${t.color}',textContent:'${t.key.slice(0,1)}'}))" />
+      <span class="bar" style="background:${t.color}"></span>
+      <span>${t.name}</span>
+    `;
+    btn.onclick = () => {
+      chart.data.datasets[idx].hidden = !chart.data.datasets[idx].hidden;
+      btn.classList.toggle("off", chart.data.datasets[idx].hidden);
+      chart.update();
+      updateAllBtn();
+    };
+    host.appendChild(btn);
+  });
+
+  document.getElementById("toggleAll").onclick = () => {
+    const visible = chart.data.datasets.filter(d => !d.hidden).length;
+    const on = visible === 0;
+    chart.data.datasets.forEach((d, i) => {
+      d.hidden = !on;
+      host.querySelectorAll(".team-toggle")[i].classList.toggle("off", !on);
+    });
+    chart.update();
+    updateAllBtn();
+  };
+
+  updateAllBtn();
+}
+
+function updateAllBtn() {
+  const btn = document.getElementById("toggleAll");
+  const visible = chart ? chart.data.datasets.filter(d => !d.hidden).length : TEAMS.length;
+  btn.textContent = visible === 0 ? `전체 선택 (0/${TEAMS.length})` : `전체 해제 (${visible}/${TEAMS.length})`;
+}
+
+// ─────────────────────────────────────────────
+// 부트
+// ─────────────────────────────────────────────
+function defaultEnd() {
+  const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+document.getElementById("endDate").value = defaultEnd();
+
+async function run() {
+  setErr("");
+  const startISO = document.getElementById("startDate").value;
+  const endISO = document.getElementById("endDate").value;
+  if (!startISO || !endISO) { setErr("입력값 누락"); return; }
+
+  try {
+    const { labels, seriesById } = await loadSeries(startISO, endISO);
+    setProgress(`완료 · ${labels.length}일치`);
+    if (labels.length === 0) { setErr("기간 내 KBO 경기 없음"); return; }
+    buildChart(labels, seriesById);
+  } catch (e) {
+    setErr(String(e));
+    setProgress("실패");
+  }
+}
+
+document.getElementById("reload").onclick = run;
+document.getElementById("clearCache").onclick = () => {
+  let n = 0;
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(CACHE_PREFIX)) { localStorage.removeItem(k); n++; }
+  }
+  setProgress(`캐시 ${n}건 삭제`);
+};
+
+run();
+</script>
+</body>
+</html>

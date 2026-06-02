@@ -1,0 +1,1534 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KBO 통합 대시보드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --ink-1: #0b0e14; --ink-2: #1f2937; --ink-3: #4b5563; --ink-4: #9ca3af;
+    --line: #e5e7eb; --line-2: #f3f4f6;
+    --bg: #ffffff; --page: #f7f8fa;
+    --accent: #dc2626; --accent-2: #fbbf24;
+    --pos: #059669; --neg: #2563eb;
+    --shadow-s: 0 1px 2px rgba(15,23,42,0.04), 0 1px 1px rgba(15,23,42,0.03);
+    --shadow-m: 0 4px 12px rgba(15,23,42,0.06), 0 2px 4px rgba(15,23,42,0.04);
+    --radius-s: 6px; --radius-m: 10px; --radius-l: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    color: var(--ink-1); background: var(--page);
+    font-feature-settings: "tnum" on; -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  .mono { font-family: "JetBrains Mono", ui-monospace, "SF Mono", monospace; }
+
+  header.topbar { position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,0.92); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line); padding: 12px 28px; display: flex; align-items: center; gap: 18px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .mark { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #dc2626 0%, #7c2d12 100%); display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 14px; }
+  .brand .name { font-weight: 700; font-size: 16px; letter-spacing: -0.3px; }
+  .brand .sub { color: var(--ink-4); font-size: 11px; font-weight: 500; letter-spacing: 0.4px; text-transform: uppercase; }
+  .topbar .spacer { flex: 1; }
+  .topbar .meta { display: flex; align-items: center; gap: 18px; font-size: 12px; color: var(--ink-3); }
+  .topbar .meta .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--line-2); border-radius: 999px; }
+  .topbar .meta .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--pos); }
+
+  .layout { display: grid; grid-template-columns: 232px 1fr; gap: 0; max-width: 100%; }
+  aside.nav { position: sticky; top: 57px; align-self: start; height: calc(100vh - 57px); overflow-y: auto;
+    padding: 24px 16px; border-right: 1px solid var(--line); background: var(--bg); }
+  .nav-group { margin-bottom: 18px; }
+  .nav-group h3 { font-size: 10px; font-weight: 700; color: var(--ink-4); letter-spacing: 1.2px; text-transform: uppercase; margin: 0 0 6px 8px; }
+  .nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .nav li a { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 8px; font-size: 13px; color: var(--ink-2); font-weight: 500; transition: all .15s; cursor: pointer; }
+  .nav li a:hover { background: var(--line-2); color: var(--ink-1); }
+  .nav li a.active { background: linear-gradient(90deg, rgba(220,38,38,0.08), rgba(220,38,38,0.02)); color: var(--accent); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); padding-left: 10px; border-radius: 0 8px 8px 0; }
+  .nav li a .ic { width: 16px; text-align: center; font-size: 13px; opacity: 0.8; }
+  .nav-all { padding: 9px 12px; background: var(--ink-1); color: #fff !important; font-weight: 600; border-radius: 8px; font-size: 13px; text-align: center; display: block; transition: all .15s; margin-bottom: 14px; }
+  .nav-all:hover { background: var(--accent); }
+  .nav-all.active { background: var(--accent); }
+
+  main { padding: 28px 36px 80px; display: flex; flex-direction: column; gap: 28px; min-width: 0; max-width: 1480px; }
+
+  .panel { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-l); box-shadow: var(--shadow-s); }
+  .panel.controls { padding: 16px 22px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; }
+  .panel label { font-size: 11px; color: var(--ink-4); font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; display: flex; flex-direction: column; gap: 5px; }
+  .panel input { font: inherit; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-s); min-width: 170px; font-size: 13px; background: var(--bg); color: var(--ink-1); transition: border-color .15s; }
+  .panel input:focus { outline: none; border-color: var(--accent); }
+  .btn { background: var(--ink-1); color: #fff; border: 0; padding: 9px 18px; border-radius: var(--radius-s); font-weight: 600; font-size: 13px; cursor: pointer; transition: all .15s; }
+  .btn:hover { background: var(--accent); }
+  .btn.secondary { background: var(--bg); color: var(--ink-2); border: 1px solid var(--line); }
+  .btn.secondary:hover { background: var(--line-2); border-color: var(--ink-4); color: var(--ink-1); }
+  .progress { color: var(--ink-3); font-size: 12px; margin-left: auto; padding-bottom: 9px; }
+
+  .section-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: -8px; padding: 0 4px; }
+  .section-header h2 { font-size: 14px; font-weight: 800; margin: 0; letter-spacing: -0.2px; text-transform: uppercase; }
+  .section-header .num { font-family: "JetBrains Mono", monospace; color: var(--accent); font-weight: 700; font-size: 12px; }
+  .section-header .sub { color: var(--ink-4); font-size: 12px; margin-left: auto; font-weight: 500; }
+
+  section.card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-l); box-shadow: var(--shadow-s); padding: 22px 24px 24px; }
+  section.card h3.card-title { margin: 0 0 4px; font-size: 18px; font-weight: 700; letter-spacing: -0.3px; display: flex; align-items: center; gap: 10px; }
+  section.card .card-desc { color: var(--ink-3); font-size: 13px; margin: 0 0 18px; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+  .kpi { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-l); padding: 16px 18px; box-shadow: var(--shadow-s); position: relative; overflow: hidden; }
+  .kpi .kpi-label { font-size: 11px; font-weight: 700; color: var(--ink-4); letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 8px; }
+  .kpi .kpi-value { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.1; font-family: "JetBrains Mono", monospace; }
+  .kpi .kpi-aux { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+  .kpi.accent .kpi-value { color: var(--accent); }
+
+  .tbl-wrap { overflow-x: auto; margin: 0 -24px; padding: 0 24px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 10px 12px; text-align: center; white-space: nowrap; border-bottom: 1px solid var(--line-2); }
+  th { background: transparent; font-weight: 700; color: var(--ink-4); font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; border-bottom: 2px solid var(--ink-1); }
+  td { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  tbody tr { transition: background .15s; }
+  tbody tr:hover { background: var(--line-2); }
+  td.team-cell { text-align: left; font-weight: 600; color: var(--ink-1); }
+  .team-pill { display: inline-flex; align-items: center; gap: 8px; }
+  .team-pill img { width: 22px; height: 22px; object-fit: contain; }
+  .team-pill .badge { width:22px; height:22px; border-radius:50%; color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; }
+  .row-rank-1 { background: linear-gradient(90deg, rgba(251,191,36,0.12), rgba(251,191,36,0) 60%); }
+  .row-rank-1 td:first-child { color: var(--accent-2); font-weight: 800; }
+
+  .pos { color: var(--pos); font-weight: 700; }
+  .neg { color: var(--neg); font-weight: 700; }
+  .streak-W { color: var(--accent); font-weight: 700; }
+  .streak-L { color: var(--neg); font-weight: 700; }
+  .streak-D { color: var(--ink-4); }
+  td.rank-cell { font-family: "JetBrains Mono", monospace; font-weight: 700; color: var(--ink-1); }
+
+  .chart-wrap { position: relative; height: 560px; margin-top: 12px; }
+  .chart-wrap.short { height: 460px; }
+
+  /* 매트릭스 (3단 셀) */
+  .matrix th, .matrix td { padding: 6px 8px; font-size: 11px; vertical-align: middle; }
+  .matrix th { border-bottom: 2px solid var(--ink-1); }
+  .matrix td.self { background: var(--line-2); color: var(--ink-4); }
+  .matrix td.cell { font-family: "JetBrains Mono", monospace; line-height: 1.45; padding: 7px 8px; }
+  .matrix .cell-main { font-weight: 700; font-size: 12px; color: var(--ink-1); }
+  .matrix .cell-sub { font-size: 10px; color: var(--ink-3); font-weight: 500; display: block; }
+  .matrix .cell-sub .ic { display: inline-block; width: 12px; opacity: 0.8; }
+  /* 색 티어 (rate 기반) */
+  .matrix .rate-good   { background: rgba(16,185,129,0.16); }
+  .matrix .rate-mid    { background: rgba(251,191,36,0.16); }
+  .matrix .rate-bad    { background: rgba(239,68,68,0.16); }
+  .matrix tbody tr:hover { background: transparent; }
+  .matrix tbody tr:hover td.cell { filter: brightness(0.97); }
+
+  .progress-bar { background: var(--line-2); border-radius: 999px; height: 8px; overflow: hidden; }
+  .progress-bar > div { height: 100%; background: linear-gradient(90deg, var(--accent), #f97316); border-radius: 999px; transition: width .6s ease; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { padding: 7px 12px; border: 1px solid var(--line); background: var(--bg); border-radius: 999px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink-2); transition: all .15s; }
+  .chip:hover { border-color: var(--ink-4); }
+  .chip img { width: 18px; height: 18px; object-fit: contain; }
+  .chip.active { background: var(--ink-1); color: #fff; border-color: var(--ink-1); }
+
+  .date-controls { display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: var(--line-2); border-radius: var(--radius-m); margin-bottom: 16px; }
+  .date-controls input[type=date] { padding: 7px 12px; border: 1px solid var(--line); border-radius: var(--radius-s); font: inherit; font-size: 13px; background: var(--bg); }
+  .icon-btn { width: 32px; height: 32px; border-radius: var(--radius-s); border: 1px solid var(--line); background: var(--bg); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; color: var(--ink-2); transition: all .15s; }
+  .icon-btn:hover { background: var(--ink-1); color: #fff; border-color: var(--ink-1); }
+
+  .split { display: grid; grid-template-columns: 1fr 1.1fr; gap: 24px; }
+  .split h4 { font-size: 12px; font-weight: 700; color: var(--ink-4); letter-spacing: 0.5px; text-transform: uppercase; margin: 0 0 10px; }
+  @media (max-width: 1000px) { .split { grid-template-columns: 1fr; } }
+
+  .games-list { display: flex; flex-direction: column; gap: 8px; }
+  .game-card { border: 1px solid var(--line); border-radius: var(--radius-m); padding: 12px 14px; display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; font-size: 13px; background: var(--bg); transition: all .15s; }
+  .game-card:hover { border-color: var(--ink-4); }
+  .game-card .away, .game-card .home { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .game-card .home { justify-content: flex-end; }
+  .game-card .score { font-weight: 800; font-size: 16px; min-width: 80px; text-align: center; font-family: "JetBrains Mono", monospace; }
+  .game-card .arena { font-size: 10px; color: var(--ink-4); grid-column: 1/-1; text-align: center; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; padding-top: 4px; border-top: 1px solid var(--line-2); margin-top: 4px; }
+  .game-card .mini-W { color: var(--accent); font-weight: 800; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(220,38,38,0.1); }
+  .game-card .mini-L { color: var(--neg); font-weight: 800; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(37,99,235,0.1); }
+  .game-card .mini-D { color: var(--ink-4); font-weight: 800; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: var(--line-2); }
+  .game-card .mini-S { color: var(--ink-3); font-weight: 800; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: var(--line-2); }
+
+  .gm-table td { vertical-align: middle; padding: 6px 8px; font-size: 11px; }
+  .gm-result { font-weight: 800; }
+  .gm-result.W { color: var(--accent); }
+  .gm-result.L { color: var(--neg); }
+  .gm-result.D { color: var(--ink-4); }
+  .gm-sched { color: var(--ink-3); font-weight: 700; font-size: 10px; padding: 2px 6px; border-radius: 4px; background: var(--line-2); display: inline-block; }
+  .gm-time { color: var(--ink-3); font-family: "JetBrains Mono", monospace; font-size: 10px; }
+  .month-tabs { display: flex; gap: 4px; flex-wrap: wrap; padding: 12px 0; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+  .month-tab { padding: 7px 14px; border: 1px solid var(--line); background: var(--bg); border-radius: 999px; font-size: 12px; cursor: pointer; font-weight: 600; color: var(--ink-2); }
+  .month-tab.active { background: var(--ink-1); color: #fff; border-color: var(--ink-1); }
+  .month-tab:hover { border-color: var(--ink-4); }
+
+  .footer-note { color: var(--ink-4); font-size: 11px; padding: 16px 0; text-align: center; letter-spacing: 0.4px; }
+  .empty { color: var(--ink-4); padding: 32px; text-align: center; font-size: 13px; }
+  .err-box { color: var(--accent); font-size: 12px; font-weight: 600; padding-bottom: 9px; }
+
+  /* SPA mode: 단일 섹션 표시 */
+  body.spa-single main > [data-section] { display: none; }
+  body.spa-single main > [data-section].active { display: block; }
+  body.spa-single main > [data-section="_controls"] { display: block; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="mark">K</div>
+    <div>
+      <div class="name">KBO Analytics</div>
+      <div class="sub">SEASON 2026 · POWERED BY PSYNET DATA 3.0</div>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="meta">
+    <span class="pill"><span class="dot"></span><span id="liveStatus">LIVE</span></span>
+    <span id="lastUpdated"></span>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="nav">
+    <a href="#" class="nav-all" data-nav="all">📋 전체 보기</a>
+
+    <div class="nav-group">
+      <h3>개요</h3>
+      <ul>
+        <li><a href="#overview" data-nav="overview"><span class="ic">⚡</span>핵심 지표</a></li>
+        <li><a href="#season-progress" data-nav="season-progress"><span class="ic">📊</span>시즌 진행률</a></li>
+        <li><a href="#standings" data-nav="standings"><span class="ic">🏆</span>종합 순위</a></li>
+      </ul>
+    </div>
+    <div class="nav-group">
+      <h3>일자별 분석</h3>
+      <ul>
+        <li><a href="#daily-stats" data-nav="daily-stats"><span class="ic">📅</span>날짜별 순위·경기</a></li>
+        <li><a href="#chart-gap" data-nav="chart-gap"><span class="ic">📉</span>게임차 변화</a></li>
+        <li><a href="#chart-wingap" data-nav="chart-wingap"><span class="ic">📈</span>일간 승차 변화</a></li>
+        <li><a href="#chart-wincount" data-nav="chart-wincount"><span class="ic">🏅</span>일간 승수 변동</a></li>
+        <li><a href="#chart-rank" data-nav="chart-rank"><span class="ic">🔢</span>일간 순위 변동</a></li>
+        <li><a href="#chart-winrate" data-nav="chart-winrate"><span class="ic">💯</span>일간 승률 변동</a></li>
+      </ul>
+    </div>
+    <div class="nav-group">
+      <h3>팀 분석</h3>
+      <ul>
+        <li><a href="#team-detail" data-nav="team-detail"><span class="ic">👥</span>팀별 게임 기록·일정</a></li>
+        <li><a href="#gamerecords" data-nav="gamerecords"><span class="ic">🎮</span>게임별 연속 기록</a></li>
+        <li><a href="#streak" data-nav="streak"><span class="ic">🔥</span>연승·연패</a></li>
+        <li><a href="#homeaway" data-nav="homeaway"><span class="ic">🏠</span>홈/원정</a></li>
+      </ul>
+    </div>
+    <div class="nav-group">
+      <h3>상대 분석</h3>
+      <ul>
+        <li><a href="#matrix" data-nav="matrix"><span class="ic">🆚</span>상대전적 매트릭스</a></li>
+        <li><a href="#remaining" data-nav="remaining"><span class="ic">📋</span>잔여 경기 수</a></li>
+        <li><a href="#series" data-nav="series"><span class="ic">⚔️</span>시리즈 분석</a></li>
+      </ul>
+    </div>
+    <div class="nav-group">
+      <h3>기간별 통계</h3>
+      <ul>
+        <li><a href="#half-season" data-nav="half-season"><span class="ic">🍃</span>전반/후반기</a></li>
+        <li><a href="#monthly" data-nav="monthly"><span class="ic">📆</span>월별</a></li>
+        <li><a href="#weekly" data-nav="weekly"><span class="ic">🗓️</span>주차별</a></li>
+        <li><a href="#weekday" data-nav="weekday"><span class="ic">📍</span>요일별</a></li>
+        <li><a href="#stadium" data-nav="stadium"><span class="ic">🏟️</span>경기장별</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main>
+    <div data-section="_controls">
+      <div class="panel controls">
+        <label>시즌 시작 <input id="startDate" type="date" value="2026-03-28" /></label>
+        <label>종료 <input id="endDate" type="date" /></label>
+        <button id="reload" class="btn">새로고침</button>
+        <button id="clearCache" class="btn secondary">캐시 삭제</button>
+        <span class="progress" id="progress">대기 중</span>
+        <span class="err-box" id="errBox"></span>
+      </div>
+    </div>
+
+    <div data-section="overview">
+      <div class="section-header"><span class="num">01</span><h2>핵심 지표</h2></div>
+      <div id="overview" style="margin-top:14px;">
+        <div class="kpi-grid" id="kpiGrid"></div>
+      </div>
+    </div>
+
+    <div data-section="season-progress">
+      <div class="section-header"><span class="num">02</span><h2>시즌 진행률</h2><span class="sub" id="seasonProgressSub"></span></div>
+      <section id="season-progress" class="card" style="margin-top:14px;">
+        <div id="seasonProgressBody"></div>
+      </section>
+    </div>
+
+    <div data-section="standings">
+      <div class="section-header"><span class="num">03</span><h2>종합 순위</h2><span class="sub" id="standingsSub"></span></div>
+      <section id="standings" class="card" style="margin-top:14px;">
+        <p class="card-desc">현재 시점 전체 지표 · 게임차/승률/홈원정/최근 폼/연속 기록까지 한눈에</p>
+        <div class="tbl-wrap"><table id="standingsTable"></table></div>
+      </section>
+    </div>
+
+    <div data-section="daily-stats">
+      <div class="section-header"><span class="num">04</span><h2>일자별 분석</h2></div>
+      <section id="daily-stats" class="card" style="margin-top:14px;">
+        <h3 class="card-title">📅 날짜별 순위 · 경기 결과</h3>
+        <p class="card-desc">선택한 날짜 마감 시점 순위와 그 날의 경기 카드 (과거 = 결과, 미래 = 예정)</p>
+        <div class="date-controls">
+          <button id="dailyPrev" class="icon-btn">‹</button>
+          <input id="dailyDate" type="date" />
+          <button id="dailyNext" class="icon-btn">›</button>
+          <button id="dailyToday" class="btn secondary">최신</button>
+          <span class="card-desc" id="dailyDateLabel" style="margin-left:auto; margin-bottom:0;"></span>
+        </div>
+        <div class="split">
+          <div>
+            <h4>📊 그 날의 팀 순위</h4>
+            <div class="tbl-wrap"><table id="dailyStandingsTbl"></table></div>
+          </div>
+          <div>
+            <h4>⚾ 그 날의 경기</h4>
+            <div class="games-list" id="dailyGamesList"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div data-section="chart-gap">
+      <section id="chart-gap" class="card">
+        <h3 class="card-title">📉 일간 게임차 변화</h3>
+        <p class="card-desc">1위 팀 대비 누적 게임차 시계열 · 라인 끝 팀 엠블럼</p>
+        <div class="chart-wrap"><canvas id="gameGapChart"></canvas></div>
+      </section>
+    </div>
+
+    <div data-section="chart-wingap">
+      <section id="chart-wingap" class="card">
+        <h3 class="card-title">📈 일간 승차 변화</h3>
+        <p class="card-desc">((1위 W − 본인 W) + (본인 L − 1위 L)) / 2</p>
+        <div class="chart-wrap"><canvas id="winGapChart"></canvas></div>
+      </section>
+    </div>
+
+    <div data-section="chart-wincount">
+      <section id="chart-wincount" class="card">
+        <h3 class="card-title">🏅 일간 승수 변동</h3>
+        <p class="card-desc">팀별 누적 승수 시계열</p>
+        <div class="chart-wrap short"><canvas id="winCountChart"></canvas></div>
+      </section>
+    </div>
+
+    <div data-section="chart-rank">
+      <section id="chart-rank" class="card">
+        <h3 class="card-title">🔢 일간 순위 변동</h3>
+        <p class="card-desc">매일 마감 시점 순위 (1=상위)</p>
+        <div class="chart-wrap"><canvas id="rankChart"></canvas></div>
+      </section>
+    </div>
+
+    <div data-section="chart-winrate">
+      <section id="chart-winrate" class="card">
+        <h3 class="card-title">💯 일간 승률 변동</h3>
+        <p class="card-desc">승률 = W / (W + L), 무승부 제외</p>
+        <div class="chart-wrap short"><canvas id="winRateChart"></canvas></div>
+      </section>
+    </div>
+
+    <div data-section="team-detail">
+      <div class="section-header"><span class="num">05</span><h2>팀 분석</h2></div>
+      <section id="team-detail" class="card" style="margin-top:14px;">
+        <h3 class="card-title">👥 팀별 게임 기록 및 일정</h3>
+        <p class="card-desc">팀 선택 시 시간순 단일 팀 / 전체 = 일자×팀 매트릭스 · 미래 경기 포함</p>
+        <div class="chips" id="teamPicker" style="margin-bottom:10px;"></div>
+        <div class="month-tabs" id="monthTabs"></div>
+        <div class="tbl-wrap"><table id="teamGamesTable" class="gm-table"></table></div>
+      </section>
+    </div>
+
+    <div data-section="gamerecords">
+      <section id="gamerecords" class="card">
+        <h3 class="card-title">🎮 게임별 연속 기록</h3>
+        <p class="card-desc">각 팀의 N번째 경기 결과 누적 연속 (3승 = 3연승, 1패 = 새 연패 시작)</p>
+        <div class="tbl-wrap"><table id="gameRecordsTable"></table></div>
+      </section>
+    </div>
+
+    <div data-section="streak">
+      <section id="streak" class="card">
+        <h3 class="card-title">🔥 연승 / 연패 기록</h3>
+        <p class="card-desc">시즌 내 최장 연승·연패 + 현재 진행 중인 연속 기록</p>
+        <div class="tbl-wrap"><table id="streakTable"></table></div>
+      </section>
+    </div>
+
+    <div data-section="homeaway">
+      <section id="homeaway" class="card">
+        <h3 class="card-title">🏠 홈 / 원정 상세 분석</h3>
+        <p class="card-desc">홈 대비 원정 편차 정렬 — 큰 양수 = 홈에서 강한 팀</p>
+        <div class="tbl-wrap"><table id="homeAwayTable"></table></div>
+      </section>
+    </div>
+
+    <div data-section="matrix">
+      <div class="section-header"><span class="num">06</span><h2>상대 분석</h2></div>
+      <section id="matrix" class="card" style="margin-top:14px;">
+        <h3 class="card-title">🆚 팀간 상대전적 매트릭스</h3>
+        <p class="card-desc">행 = 기준 팀 / 열 = 상대 팀 · 셀: 총 W-L-D (승률) + 홈/원정 분리 · 컬러: <span style="color:#059669;font-weight:700;">우세(>0.5)</span> · <span style="color:#b45309;font-weight:700;">동률(=0.5)</span> · <span style="color:#dc2626;font-weight:700;">열세(<0.5)</span></p>
+        <div class="tbl-wrap"><table id="matrixTable" class="matrix"></table></div>
+      </section>
+    </div>
+
+    <div data-section="remaining">
+      <section id="remaining" class="card">
+        <h3 class="card-title">📋 팀간 잔여 경기 수</h3>
+        <p class="card-desc">시즌 상호 16경기 기준 · 색 농도 = 잔여 비중</p>
+        <div class="tbl-wrap"><table id="remainingTable" class="matrix"></table></div>
+      </section>
+    </div>
+
+    <div data-section="series">
+      <section id="series" class="card">
+        <h3 class="card-title">⚔️ 시리즈 분석</h3>
+        <p class="card-desc">같은 양 팀 · 같은 경기장 · 연속된 날짜를 한 시리즈로 묶음 (최신순)</p>
+        <div class="tbl-wrap"><table id="seriesTable"></table></div>
+      </section>
+    </div>
+
+    <div data-section="half-season">
+      <div class="section-header"><span class="num">07</span><h2>기간별 통계</h2></div>
+      <section id="half-season" class="card" style="margin-top:14px;">
+        <h3 class="card-title">🍃 전반기 / 후반기 성적</h3>
+        <p class="card-desc">7월 15일 분할 기준 (올스타 브레이크 근사)</p>
+        <div class="tbl-wrap"><table id="halfSeasonTable"></table></div>
+      </section>
+    </div>
+
+    <div data-section="monthly">
+      <section id="monthly" class="card">
+        <h3 class="card-title">📆 월별 성적</h3>
+        <div class="tbl-wrap"><table id="monthlyTable"></table></div>
+      </section>
+    </div>
+
+    <div data-section="weekly">
+      <section id="weekly" class="card">
+        <h3 class="card-title">🗓️ 주차별 성적</h3>
+        <p class="card-desc">ISO 주차 기준</p>
+        <div class="tbl-wrap"><table id="weeklyTable"></table></div>
+      </section>
+    </div>
+
+    <div data-section="weekday">
+      <section id="weekday" class="card">
+        <h3 class="card-title">📍 요일별 성적</h3>
+        <div class="tbl-wrap"><table id="weekdayTable"></table></div>
+      </section>
+    </div>
+
+    <div data-section="stadium">
+      <section id="stadium" class="card">
+        <h3 class="card-title">🏟️ 경기장별 성적</h3>
+        <p class="card-desc">경기장 주최팀 식별 + 홈 승률</p>
+        <div class="tbl-wrap"><table id="stadiumTable"></table></div>
+      </section>
+    </div>
+
+    <div class="footer-note">
+      Data: data.psynet.co.kr / GAME_LIST · LEAGUE_ID 11 (KBO 1군)
+    </div>
+  </main>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────
+// 팀 메타
+// ─────────────────────────────────────────────────────────────────
+const TEAMS = [
+  { id:"1LG", key:"LG",   name:"LG",   color:"#C30452", logo:"https://kbo-dashboard.co.kr/images/teams/lg.png" },
+  { id:"1KT", key:"KT",   name:"KT",   color:"#000000", logo:"https://kbo-dashboard.co.kr/images/teams/kt.png" },
+  { id:"1SS", key:"삼성", name:"삼성", color:"#074CA1", logo:"https://kbo-dashboard.co.kr/images/teams/samsung.png" },
+  { id:"1HT", key:"KIA",  name:"KIA",  color:"#EA0029", logo:"https://kbo-dashboard.co.kr/images/teams/kia.png" },
+  { id:"1HH", key:"한화", name:"한화", color:"#FF6600", logo:"https://kbo-dashboard.co.kr/images/teams/hanwha.png" },
+  { id:"1OB", key:"두산", name:"두산", color:"#131230", logo:"https://kbo-dashboard.co.kr/images/teams/doosan.png" },
+  { id:"1NC", key:"NC",   name:"NC",   color:"#315288", logo:"https://kbo-dashboard.co.kr/images/teams/nc.png" },
+  { id:"1SK", key:"SSG",  name:"SSG",  color:"#CE0E2D", logo:"https://kbo-dashboard.co.kr/images/teams/ssg.png" },
+  { id:"1LT", key:"롯데", name:"롯데", color:"#002955", logo:"https://kbo-dashboard.co.kr/images/teams/lotte.png" },
+  { id:"1WO", key:"키움", name:"키움", color:"#820024", logo:"https://kbo-dashboard.co.kr/images/teams/kiwoom.png" },
+];
+const TEAM_BY_ID = Object.fromEntries(TEAMS.map(t=>[t.id, t]));
+const TEAM_BY_KEY = Object.fromEntries(TEAMS.map(t=>[t.key, t]));
+
+const API_BASES = [
+  "/api/livescore/gameList",
+  "https://data.psynet.co.kr/data3V1/livescore/gameList"
+];
+const CACHE_PREFIX = "kbo_gl_v3_";
+const KBO_TOTAL_GAMES = 144;
+const KBO_VS_GAMES = 16;
+const FUTURE_CACHE_TTL = 6 * 3600 * 1000; // 미래 일정 캐시: 6시간
+
+// ─────────────────────────────────────────────────────────────────
+// 유틸
+// ─────────────────────────────────────────────────────────────────
+const pad = n => String(n).padStart(2, "0");
+const ymd = d => `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+const ymdSlash = s => `${s.slice(4,6)}/${s.slice(6,8)}`;
+const ymdHuman = s => `${parseInt(s.slice(4,6))}월 ${parseInt(s.slice(6,8))}일`;
+const ymdHumanFull = s => `${s.slice(0,4)}년 ${parseInt(s.slice(4,6))}월 ${parseInt(s.slice(6,8))}일`;
+const todayYMD = () => ymd(new Date());
+const isoToYMD = iso => iso.replaceAll("-","");
+const ymdToISO = y => `${y.slice(0,4)}-${y.slice(4,6)}-${y.slice(6,8)}`;
+const weekdayKo = ["일","월","화","수","목","금","토"];
+const weekdayOf = s => weekdayKo[new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T00:00:00`).getDay()];
+const dateOf = s => new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T00:00:00`);
+const setProgress = t => document.getElementById("progress").textContent = t;
+const setErr = t => document.getElementById("errBox").textContent = t || "";
+
+const fmtRate = (W, L) => { const T=W+L; return T?(W/T).toFixed(3):"0.000"; };
+const fmtSign = n => n > 0 ? `+${n}` : `${n}`;
+
+function teamPill(team, size=22) {
+  return `<span class="team-pill"><img src="${team.logo}" alt="${team.name}" style="width:${size}px;height:${size}px;" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'badge',style:'background:${team.color};width:${size}px;height:${size}px',textContent:'${team.key.slice(0,1)}'}))" />${team.name}</span>`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// API (auth_key는 서버측에서 주입 - Netlify Function 또는 serve.py)
+// 과거 = 영구 캐시, 미래 = 6시간 TTL
+// ─────────────────────────────────────────────────────────────────
+async function fetchDay(dateYMD) {
+  const cacheKey = CACHE_PREFIX + dateYMD;
+  const today = todayYMD();
+  const isPast = dateYMD < today;
+
+  if (isPast) {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) { try { return JSON.parse(cached); } catch (e) {} }
+  } else {
+    const metaRaw = localStorage.getItem(cacheKey + "_meta");
+    if (metaRaw) {
+      try {
+        const meta = JSON.parse(metaRaw);
+        if (Date.now() - meta.ts < FUTURE_CACHE_TTL) {
+          const data = localStorage.getItem(cacheKey);
+          if (data) return JSON.parse(data);
+        }
+      } catch (e) {}
+    }
+  }
+
+  const qs = `?search_date=${dateYMD}&compe=baseball`;
+  let j = null, lastErr = null;
+  for (const base of API_BASES) {
+    try {
+      const r = await fetch(base + qs);
+      if (!r.ok) { lastErr = new Error(`HTTP ${r.status}`); continue; }
+      j = await r.json(); break;
+    } catch (e) { lastErr = e; }
+  }
+  if (!j) throw new Error(`fetch 실패 @ ${dateYMD}: ${lastErr}`);
+  const all = j?.Data?.list || [];
+  // KBO 1군 전체 (완료 + 예정 모두 포함)
+  const kbo = all.filter(g => g.LEAGUE_ID === "11");
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify(kbo));
+    if (!isPast) localStorage.setItem(cacheKey + "_meta", JSON.stringify({ ts: Date.now() }));
+  } catch (e) {}
+  return kbo;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 데이터 스토어
+// ─────────────────────────────────────────────────────────────────
+const STORE = {
+  games: [],             // 완료된 경기만 (스탯용)
+  scheduled: [],         // 예정 경기
+  byDate: {},            // 전체 (날짜별)
+  byTeam: {},            // 전체 (팀별)
+  cumByActiveDate: [],   // 완료 경기 누적 스냅샷
+  allActiveDates: [],    // 완료 경기가 있는 날짜
+  allDatesWithGames: [], // 완료 + 예정 모든 날짜 (시간순)
+  startDate: null, endDate: null
+};
+
+async function loadAll(startISO, endISO) {
+  const start = new Date(startISO + "T00:00:00");
+  const end = new Date(endISO + "T00:00:00");
+  if (end < start) throw new Error("종료일이 시작일보다 빠름");
+
+  const dates = [];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate()+1)) dates.push(ymd(d));
+
+  const CHUNK = 10;
+  const dayGames = {};
+  for (let i = 0; i < dates.length; i += CHUNK) {
+    const ch = dates.slice(i, i+CHUNK);
+    setProgress(`불러오는 중 ${Math.min(i+CHUNK, dates.length)}/${dates.length}`);
+    const res = await Promise.all(ch.map(d => fetchDay(d).catch(e => { console.warn(e); return []; })));
+    ch.forEach((d, idx) => { dayGames[d] = res[idx]; });
+  }
+
+  STORE.games = []; STORE.scheduled = []; STORE.byDate = {};
+  STORE.byTeam = Object.fromEntries(TEAMS.map(t => [t.id, []]));
+  STORE.startDate = isoToYMD(startISO); STORE.endDate = isoToYMD(endISO);
+
+  for (const d of dates) {
+    const games = dayGames[d] || [];
+    const norm = [];
+    for (const g of games) {
+      if (!TEAM_BY_ID[g.HOME_TEAM_ID] || !TEAM_BY_ID[g.AWAY_TEAM_ID]) continue;
+      const isFinished = g.STATE === "F";
+      const hs = parseInt(g.HOME_SCORE, 10);
+      const as = parseInt(g.AWAY_SCORE, 10);
+      if (isFinished && (isNaN(hs) || isNaN(as))) continue;
+      const result = isFinished ? (hs > as ? "W" : as > hs ? "L" : "D") : null;
+      const row = {
+        date: d, home: g.HOME_TEAM_ID, away: g.AWAY_TEAM_ID,
+        hs: isFinished ? hs : null, as: isFinished ? as : null,
+        result, status: g.STATE,
+        arena: g.ARENA_ID, arenaName: g.ARENA_NAME || "",
+        matchTime: g.MATCH_TIME || ""
+      };
+      norm.push(row);
+      if (isFinished) STORE.games.push(row); else STORE.scheduled.push(row);
+      STORE.byTeam[g.HOME_TEAM_ID].push({
+        date: d, opp: g.AWAY_TEAM_ID, isHome: true,
+        status: g.STATE,
+        result, score: isFinished ? hs : null, oppScore: isFinished ? as : null,
+        arena: g.ARENA_ID, arenaName: g.ARENA_NAME || "",
+        matchTime: g.MATCH_TIME || ""
+      });
+      STORE.byTeam[g.AWAY_TEAM_ID].push({
+        date: d, opp: g.HOME_TEAM_ID, isHome: false,
+        status: g.STATE,
+        result: isFinished ? (result === "W" ? "L" : result === "L" ? "W" : "D") : null,
+        score: isFinished ? as : null, oppScore: isFinished ? hs : null,
+        arena: g.ARENA_ID, arenaName: g.ARENA_NAME || "",
+        matchTime: g.MATCH_TIME || ""
+      });
+    }
+    if (norm.length) STORE.byDate[d] = norm;
+  }
+  STORE.allDatesWithGames = Object.keys(STORE.byDate).sort();
+
+  STORE.cumByActiveDate = []; STORE.allActiveDates = [];
+  const wl = Object.fromEntries(TEAMS.map(t => [t.id, { W:0, L:0, D:0 }]));
+  for (const d of dates) {
+    const games = (STORE.byDate[d] || []).filter(g => g.status === "F");
+    if (!games.length) continue;
+    for (const g of games) {
+      if (g.result === "W") { wl[g.home].W++; wl[g.away].L++; }
+      else if (g.result === "L") { wl[g.away].W++; wl[g.home].L++; }
+      else { wl[g.home].D++; wl[g.away].D++; }
+    }
+    const snap = {}; for (const id in wl) snap[id] = { ...wl[id] };
+    STORE.cumByActiveDate.push({ date: d, snapshot: snap });
+    STORE.allActiveDates.push(d);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 컴퓨트
+// ─────────────────────────────────────────────────────────────────
+function snapshotAt(targetYMD) {
+  let snap = null;
+  for (const s of STORE.cumByActiveDate) { if (s.date <= targetYMD) snap = s; else break; }
+  return snap;
+}
+function snapshotLatest() { return STORE.cumByActiveDate.length ? STORE.cumByActiveDate[STORE.cumByActiveDate.length-1] : null; }
+function rankFromWL(wl) {
+  const arr = TEAMS.map(t => {
+    const r = wl[t.id]; const T = r.W + r.L;
+    return { team: t, W: r.W, L: r.L, D: r.D, rate: T ? r.W / T : 0, diff: r.W - r.L, games: r.W + r.L + r.D };
+  });
+  arr.sort((a, b) => b.rate - a.rate || b.diff - a.diff || (b.W - a.W));
+  const lead = arr.length ? arr[0].diff : 0;
+  arr.forEach((row, i) => { row.rank = i + 1; row.gap = (lead - row.diff) / 2; });
+  return arr;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 1) KPI
+// ─────────────────────────────────────────────────────────────────
+function renderKPI() {
+  const root = document.getElementById("kpiGrid");
+  const snap = snapshotLatest();
+  if (!snap) { root.innerHTML = `<div class="empty" style="grid-column:1/-1;">데이터 없음</div>`; return; }
+  const ranked = rankFromWL(snap.snapshot);
+  const top = ranked[0], bot = ranked[ranked.length-1];
+  const totalGames = STORE.games.length;
+  const totalDays = STORE.allActiveDates.length;
+  const totalScheduled = KBO_TOTAL_GAMES * TEAMS.length / 2;
+  const pct = (totalGames / totalScheduled * 100).toFixed(1);
+  let bigStreak = { n: 0, team: null, type: "W" };
+  TEAMS.forEach(t => {
+    const games = STORE.byTeam[t.id].filter(g => g.status === "F").sort((a,b)=> a.date.localeCompare(b.date));
+    let cur = "", n = 0;
+    for (let i = games.length - 1; i >= 0; i--) {
+      if (i === games.length - 1) { cur = games[i].result; n = 1; continue; }
+      if (games[i].result === cur) n++; else break;
+    }
+    if (n > bigStreak.n) bigStreak = { n, team: t, type: cur };
+  });
+  const lastDate = snap.date;
+  const lastGames = (STORE.byDate[lastDate] || []).filter(g => g.status === "F");
+  const upcomingCount = STORE.scheduled.length;
+
+  root.innerHTML = `
+    <div class="kpi accent">
+      <div class="kpi-label">현재 1위</div>
+      <div class="kpi-value">${top.team.key}</div>
+      <div class="kpi-aux">${top.W}승 ${top.L}패 ${top.D ? top.D + "무 · " : "· "}승률 ${top.rate.toFixed(3)}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">최하위</div>
+      <div class="kpi-value" style="color:var(--neg);">${bot.team.key}</div>
+      <div class="kpi-aux">${bot.gap}게임차 · 승률 ${bot.rate.toFixed(3)}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">진행률</div>
+      <div class="kpi-value">${pct}%</div>
+      <div class="kpi-aux">${totalGames} / ${totalScheduled} 경기</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">경기 일수</div>
+      <div class="kpi-value">${totalDays}</div>
+      <div class="kpi-aux">${ymdHuman(STORE.allActiveDates[0])} ~ ${ymdHuman(lastDate)}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">최장 연속 진행</div>
+      <div class="kpi-value" style="color:${bigStreak.type === "W" ? "var(--accent)" : "var(--neg)"};">${bigStreak.n}${bigStreak.type === "W" ? "승" : "패"}</div>
+      <div class="kpi-aux">${bigStreak.team ? bigStreak.team.name : "-"}</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">예정 경기</div>
+      <div class="kpi-value">${upcomingCount}</div>
+      <div class="kpi-aux">${ymdHuman(lastDate)} 이후</div>
+    </div>
+  `;
+  document.getElementById("lastUpdated").textContent = `최종 갱신: ${ymdHumanFull(lastDate)}`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 2) 시즌 진행률
+// ─────────────────────────────────────────────────────────────────
+function renderSeasonProgress() {
+  const root = document.getElementById("seasonProgressBody");
+  const snap = snapshotLatest();
+  if (!snap) { root.innerHTML = `<div class="empty">데이터 없음</div>`; return; }
+  const teamRows = TEAMS.map(t => {
+    const s = snap.snapshot[t.id];
+    const played = s.W + s.L + s.D;
+    const pct = Math.min(100, (played / KBO_TOTAL_GAMES) * 100);
+    return `<tr>
+      <td class="team-cell">${teamPill(t)}</td>
+      <td class="mono">${played} / ${KBO_TOTAL_GAMES}</td>
+      <td class="mono">${pct.toFixed(1)}%</td>
+      <td style="min-width:220px;"><div class="progress-bar"><div style="width:${pct}%"></div></div></td>
+      <td class="mono">${KBO_TOTAL_GAMES - played}</td>
+    </tr>`;
+  }).join("");
+  const totalPlayed = STORE.games.length;
+  const totalScheduled = KBO_TOTAL_GAMES * TEAMS.length / 2;
+  const overallPct = (totalPlayed / totalScheduled) * 100;
+  document.getElementById("seasonProgressSub").textContent = `전체 ${totalPlayed} / ${totalScheduled} (${overallPct.toFixed(1)}%)`;
+  root.innerHTML = `<div class="tbl-wrap"><table>
+    <thead><tr><th>팀</th><th>소화 경기</th><th>비율</th><th>진행</th><th>잔여</th></tr></thead>
+    <tbody>${teamRows}</tbody>
+  </table></div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 3) 종합 순위
+// ─────────────────────────────────────────────────────────────────
+function computeFullStanding(targetYMD) {
+  const snap = targetYMD ? snapshotAt(targetYMD) : snapshotLatest();
+  if (!snap) return [];
+  const ranked = rankFromWL(snap.snapshot);
+  ranked.forEach(row => {
+    const games = STORE.byTeam[row.team.id].filter(g => g.status === "F" && g.date <= snap.date)
+      .sort((a,b)=> a.date.localeCompare(b.date));
+    const last10 = games.slice(-10);
+    const l10 = { W:0, L:0, D:0 };
+    last10.forEach(g => l10[g.result]++);
+    row.last10 = `${l10.W}-${l10.L}-${l10.D}`;
+    let cur = "", curN = 0;
+    for (let i = games.length - 1; i >= 0; i--) {
+      if (i === games.length - 1) { cur = games[i].result; curN = 1; continue; }
+      if (games[i].result === cur) curN++; else break;
+    }
+    row.streak = curN ? `${curN}${cur === "W" ? "승" : cur === "L" ? "패" : "무"}` : "-";
+    row.streakClass = cur === "W" ? "streak-W" : cur === "L" ? "streak-L" : "streak-D";
+    const home = { W:0, L:0, D:0 }, away = { W:0, L:0, D:0 };
+    games.forEach(g => (g.isHome ? home : away)[g.result]++);
+    row.home = home; row.away = away;
+    row.homeRate = fmtRate(home.W, home.L);
+    row.awayRate = fmtRate(away.W, away.L);
+    row.remain = KBO_TOTAL_GAMES - row.games;
+  });
+  return ranked;
+}
+
+function renderStandings() {
+  const ranked = computeFullStanding();
+  const snap = snapshotLatest();
+  document.getElementById("standingsSub").textContent = snap ? `${ymdHuman(snap.date)} 기준` : "";
+  const rows = ranked.map(row => `
+    <tr class="${row.rank === 1 ? "row-rank-1" : ""}">
+      <td class="rank-cell">${row.rank}</td>
+      <td class="team-cell">${teamPill(row.team)}</td>
+      <td class="mono">${row.games}</td><td class="mono">${row.W}</td><td class="mono">${row.L}</td><td class="mono">${row.D}</td>
+      <td class="mono ${row.diff > 0 ? "pos" : row.diff < 0 ? "neg" : ""}">${fmtSign(row.diff)}</td>
+      <td class="mono"><b>${row.rate.toFixed(3)}</b></td>
+      <td class="mono">${row.gap === 0 ? "동률" : row.gap}</td>
+      <td class="mono">${row.remain}</td><td class="mono">${row.last10}</td>
+      <td class="${row.streakClass}">${row.streak}</td>
+      <td class="mono">${row.home.W}-${row.home.L}-${row.home.D}</td><td class="mono">${row.homeRate}</td>
+      <td class="mono">${row.away.W}-${row.away.L}-${row.away.D}</td><td class="mono">${row.awayRate}</td>
+    </tr>`).join("");
+  document.getElementById("standingsTable").innerHTML = `
+    <thead><tr>
+      <th>순위</th><th>팀</th><th>G</th><th>W</th><th>L</th><th>D</th><th>±</th>
+      <th>승률</th><th>게임차</th><th>잔여</th><th>최근10</th><th>연속</th>
+      <th>홈 W-L-D</th><th>홈 승률</th><th>원정 W-L-D</th><th>원정 승률</th>
+    </tr></thead><tbody>${rows}</tbody>`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 4) 일자별
+// ─────────────────────────────────────────────────────────────────
+function renderDailyForDate(dateYMD) {
+  document.getElementById("dailyDateLabel").textContent = `${ymdHumanFull(dateYMD)} (${weekdayOf(dateYMD)})`;
+  const ranked = computeFullStanding(dateYMD);
+  const rows = ranked.map(row => `
+    <tr class="${row.rank === 1 ? "row-rank-1" : ""}">
+      <td class="rank-cell">${row.rank}</td>
+      <td class="team-cell">${teamPill(row.team)}</td>
+      <td class="mono">${row.W}-${row.L}-${row.D}</td>
+      <td class="mono"><b>${row.rate.toFixed(3)}</b></td>
+      <td class="mono">${row.gap === 0 ? "동률" : row.gap}</td>
+    </tr>`).join("");
+  document.getElementById("dailyStandingsTbl").innerHTML = `
+    <thead><tr><th>순위</th><th>팀</th><th>W-L-D</th><th>승률</th><th>게임차</th></tr></thead>
+    <tbody>${rows}</tbody>`;
+
+  const games = STORE.byDate[dateYMD] || [];
+  const root = document.getElementById("dailyGamesList");
+  if (!games.length) { root.innerHTML = `<div class="empty">경기 없음</div>`; return; }
+  root.innerHTML = games.map(g => {
+    const home = TEAM_BY_ID[g.home], away = TEAM_BY_ID[g.away];
+    if (g.status !== "F") {
+      return `
+        <div class="game-card">
+          <div class="away">${teamPill(away)}</div>
+          <div class="score" style="font-size:13px;color:var(--ink-3);"><span class="mini-S">예정</span><br>${g.matchTime || "-"}</div>
+          <div class="home">${teamPill(home)}</div>
+          <div class="arena">🏟️ ${g.arenaName || g.arena || "-"}</div>
+        </div>`;
+    }
+    const homeTag = g.result === "W" ? `<span class="mini-W">W</span>` : g.result === "L" ? `<span class="mini-L">L</span>` : `<span class="mini-D">D</span>`;
+    const awayTag = g.result === "L" ? `<span class="mini-W">W</span>` : g.result === "W" ? `<span class="mini-L">L</span>` : `<span class="mini-D">D</span>`;
+    return `
+      <div class="game-card">
+        <div class="away">${teamPill(away)} ${awayTag}</div>
+        <div class="score">${g.as} : ${g.hs}</div>
+        <div class="home">${homeTag} ${teamPill(home)}</div>
+        <div class="arena">🏟️ ${g.arenaName || g.arena || "-"}</div>
+      </div>`;
+  }).join("");
+}
+
+function initDailyControls() {
+  const input = document.getElementById("dailyDate");
+  const last = STORE.allActiveDates[STORE.allActiveDates.length - 1];
+  input.value = last ? ymdToISO(last) : "";
+  const all = STORE.allDatesWithGames;
+  const onChange = () => renderDailyForDate(isoToYMD(input.value));
+  input.onchange = onChange;
+  document.getElementById("dailyPrev").onclick = () => {
+    const idx = all.indexOf(isoToYMD(input.value));
+    if (idx > 0) { input.value = ymdToISO(all[idx - 1]); onChange(); }
+  };
+  document.getElementById("dailyNext").onclick = () => {
+    const idx = all.indexOf(isoToYMD(input.value));
+    if (idx >= 0 && idx < all.length - 1) { input.value = ymdToISO(all[idx + 1]); onChange(); }
+  };
+  document.getElementById("dailyToday").onclick = () => { if (last) { input.value = ymdToISO(last); onChange(); } };
+  if (input.value) onChange();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 5) 일간 차트
+// ─────────────────────────────────────────────────────────────────
+const LOGO_IMG = {};
+function preloadLogos() {
+  TEAMS.forEach(t => {
+    const img = new Image();
+    img.onload = () => { LOGO_IMG[t.id] = img; Object.values(CHARTS).forEach(c => c.draw()); };
+    img.onerror = () => { LOGO_IMG[t.id] = null; };
+    img.src = t.logo;
+  });
+}
+
+const endLogosPlugin = {
+  id: "endLogos",
+  afterDatasetsDraw(chart) {
+    const ctx = chart.ctx;
+    const lastIdx = chart.data.labels.length - 1;
+    if (lastIdx < 0) return;
+    const items = [];
+    chart.data.datasets.forEach((ds, i) => {
+      if (!chart.isDatasetVisible(i)) return;
+      const meta = chart.getDatasetMeta(i);
+      const pt = meta.data[lastIdx]; if (!pt) return;
+      const team = TEAM_BY_KEY[ds.label]; if (!team) return;
+      items.push({ team, x: pt.x, y: pt.y });
+    });
+    const SIZE = 28, GAP = SIZE * 0.85;
+    items.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < items.length; i++) {
+      if (items[i].y - items[i-1].y < GAP) items[i].y = items[i-1].y + GAP;
+    }
+    const bottomLimit = chart.chartArea.bottom + SIZE/2;
+    if (items.length && items[items.length-1].y > bottomLimit) {
+      const sh = items[items.length-1].y - bottomLimit;
+      items.forEach(it => it.y -= sh);
+    }
+    ctx.save();
+    items.forEach(it => {
+      const img = LOGO_IMG[it.team.id];
+      const dx = it.x + 8, dy = it.y - SIZE/2;
+      if (img && img.complete && img.naturalWidth > 0) {
+        const nw = img.naturalWidth, nh = img.naturalHeight;
+        const sc = Math.min(SIZE / nw, SIZE / nh);
+        const dw = nw * sc, dh = nh * sc;
+        ctx.drawImage(img, dx + (SIZE - dw) / 2, dy + (SIZE - dh) / 2, dw, dh);
+      } else {
+        const cx = dx + SIZE/2, cy = dy + SIZE/2;
+        ctx.fillStyle = it.team.color;
+        ctx.beginPath(); ctx.arc(cx, cy, SIZE/2, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "#fff"; ctx.font = "bold 10px sans-serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(it.team.key.slice(0, 1), cx, cy);
+      }
+    });
+    ctx.restore();
+  }
+};
+
+const CHARTS = {};
+function buildLineChart(canvasId, labels, seriesByKey, opts = {}) {
+  const ctx = document.getElementById(canvasId); if (!ctx) return;
+  if (CHARTS[canvasId]) CHARTS[canvasId].destroy();
+  const datasets = TEAMS.map(t => ({
+    label: t.key, data: seriesByKey[t.key] || [],
+    borderColor: t.color, backgroundColor: t.color + "20",
+    borderWidth: 2, fill: false, tension: 0.2,
+    pointRadius: 2, pointHoverRadius: 5,
+    pointBackgroundColor: t.color, pointBorderColor: t.color
+  }));
+  CHARTS[canvasId] = new Chart(ctx.getContext("2d"), {
+    type: "line", data: { labels, datasets },
+    plugins: [endLogosPlugin],
+    options: Object.assign({
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { left: 8, right: 60, top: 14, bottom: 8 } },
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: "index", intersect: false,
+          backgroundColor: "rgba(11,14,20,0.95)", padding: 12,
+          borderColor: "rgba(255,255,255,0.1)", borderWidth: 1,
+          titleFont: { weight: 700, size: 12 }, bodyFont: { size: 12 },
+          itemSort: (a, b) => a.parsed.y - b.parsed.y,
+          callbacks: {
+            title: items => `${items[0].label} 기준`,
+            label: c => `${c.dataset.label}: ${opts.fmtLabel ? opts.fmtLabel(c.parsed.y) : c.parsed.y}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 }, maxTicksLimit: 40, color: "#9ca3af" },
+          grid: { color: "rgba(0,0,0,0.04)" }, border: { color: "#e5e7eb" }
+        },
+        y: Object.assign({
+          ticks: { color: "#9ca3af", font: { size: 10 } },
+          grid: { color: "rgba(0,0,0,0.04)" }, border: { color: "#e5e7eb" }
+        }, opts.yScale || {})
+      },
+      animation: { duration: 600 }
+    }, opts.options || {})
+  });
+}
+
+function renderDailyCharts() {
+  const labels = STORE.allActiveDates.map(ymdSlash);
+  const series = { gap:{}, winGap:{}, winCount:{}, rank:{}, winRate:{} };
+  TEAMS.forEach(t => { series.gap[t.key]=[]; series.winGap[t.key]=[]; series.winCount[t.key]=[]; series.rank[t.key]=[]; series.winRate[t.key]=[]; });
+
+  STORE.cumByActiveDate.forEach(({ snapshot }) => {
+    const ranked = rankFromWL(snapshot);
+    const byId = Object.fromEntries(ranked.map(r => [r.team.id, r]));
+    TEAMS.forEach(t => {
+      const r = byId[t.id];
+      series.gap[t.key].push(r.gap); series.winGap[t.key].push(r.gap);
+      series.winCount[t.key].push(r.W); series.rank[t.key].push(r.rank);
+      series.winRate[t.key].push(parseFloat(r.rate.toFixed(3)));
+    });
+  });
+
+  const gapTicks = { color: "#9ca3af", font: { size: 10 }, stepSize: 1, callback: v => v === 0 ? "동률" : v };
+  buildLineChart("gameGapChart", labels, series.gap, {
+    yScale: { reverse: true, beginAtZero: true, title: { display: true, text: "게임차", color: "#6b7280", font: { weight: 600, size: 11 } }, ticks: gapTicks, grid: { color: "rgba(0,0,0,0.04)" }, border: { color: "#e5e7eb" } },
+    fmtLabel: v => v === 0 ? "동률" : `${v}게임차`
+  });
+  buildLineChart("winGapChart", labels, series.winGap, {
+    yScale: { reverse: true, beginAtZero: true, title: { display: true, text: "승차", color: "#6b7280", font: { weight: 600, size: 11 } }, ticks: gapTicks, grid: { color: "rgba(0,0,0,0.04)" }, border: { color: "#e5e7eb" } },
+    fmtLabel: v => v === 0 ? "동률" : `${v}게임차`
+  });
+  buildLineChart("winCountChart", labels, series.winCount, {
+    yScale: { beginAtZero: true, title: { display: true, text: "승수", color: "#6b7280", font: { weight: 600, size: 11 } }, ticks: { color: "#9ca3af", font: { size: 10 } }, grid: { color: "rgba(0,0,0,0.04)" }, border: { color: "#e5e7eb" } }
+  });
+  buildLineChart("rankChart", labels, series.rank, {
+    yScale: { reverse: true, min: 1, max: 10, title: { display: true, text: "순위", color: "#6b7280", font: { weight: 600, size: 11 } }, ticks: { color: "#9ca3af", font: { size: 10 }, stepSize: 1 }, grid: { color: "rgba(0,0,0,0.04)" }, border: { color: "#e5e7eb" } }
+  });
+  buildLineChart("winRateChart", labels, series.winRate, {
+    yScale: { min: 0.2, max: 0.8, title: { display: true, text: "승률", color: "#6b7280", font: { weight: 600, size: 11 } }, ticks: { color: "#9ca3af", font: { size: 10 } }, grid: { color: "rgba(0,0,0,0.04)" }, border: { color: "#e5e7eb" } },
+    fmtLabel: v => v.toFixed(3)
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 6) 팀별 게임 기록 (과거 + 예정)
+// ─────────────────────────────────────────────────────────────────
+let selectedTeamId = null;
+let selectedMonth = "all";   // "all" | "current" | "03" | "04" ...
+
+function renderTeamPicker() {
+  const root = document.getElementById("teamPicker");
+  root.innerHTML = `<div class="chip ${selectedTeamId === null ? "active" : ""}" data-id="">📊 전체</div>` +
+    TEAMS.map(t => `<div class="chip ${selectedTeamId === t.id ? "active" : ""}" data-id="${t.id}"><img src="${t.logo}" onerror="this.remove()"/>${t.name}</div>`).join("");
+  root.querySelectorAll(".chip").forEach(c => {
+    c.onclick = () => { selectedTeamId = c.dataset.id || null; renderTeamPicker(); renderTeamGames(); };
+  });
+}
+
+function renderMonthTabs() {
+  const root = document.getElementById("monthTabs");
+  const months = new Set();
+  STORE.allDatesWithGames.forEach(d => months.add(d.slice(4,6)));
+  const monthArr = Array.from(months).sort();
+  const cur = todayYMD().slice(4,6);
+  const tabs = [
+    `<div class="month-tab ${selectedMonth === "all" ? "active" : ""}" data-m="all">📅 전체</div>`,
+    `<div class="month-tab ${selectedMonth === "current" ? "active" : ""}" data-m="current">📍 현재</div>`,
+    ...monthArr.map(m => `<div class="month-tab ${selectedMonth === m ? "active" : ""}" data-m="${m}">${parseInt(m)}월</div>`)
+  ];
+  root.innerHTML = tabs.join("");
+  root.querySelectorAll(".month-tab").forEach(t => {
+    t.onclick = () => { selectedMonth = t.dataset.m; renderMonthTabs(); renderTeamGames(); };
+  });
+}
+
+function filterDatesByMonth(dates) {
+  if (selectedMonth === "all") return dates;
+  if (selectedMonth === "current") {
+    const today = todayYMD();
+    return dates.filter(d => Math.abs(dateOf(d) - dateOf(today)) < 7 * 86400000);
+  }
+  return dates.filter(d => d.slice(4,6) === selectedMonth);
+}
+
+function renderTeamGames() {
+  const tbl = document.getElementById("teamGamesTable");
+  const datesSorted = filterDatesByMonth(STORE.allDatesWithGames.slice());
+  if (!datesSorted.length) { tbl.innerHTML = `<tbody><tr><td class="empty">데이터 없음</td></tr></tbody>`; return; }
+
+  if (selectedTeamId === null) {
+    const head = `<thead><tr><th style="text-align:left;">날짜</th>${TEAMS.map(t => `<th>${teamPill(t, 18)}</th>`).join("")}</tr></thead>`;
+    const body = datesSorted.map(d => {
+      const games = STORE.byDate[d];
+      const byTeam = {};
+      games.forEach(g => {
+        const homeT = TEAM_BY_ID[g.home], awayT = TEAM_BY_ID[g.away];
+        if (g.status === "F") {
+          const homeRes = g.result === "W" ? "승" : g.result === "L" ? "패" : "무";
+          const awayRes = g.result === "L" ? "승" : g.result === "W" ? "패" : "무";
+          byTeam[g.home] = { opp: awayT, isHome: true, res: homeRes, score: `${g.hs}-${g.as}`, status: "F" };
+          byTeam[g.away] = { opp: homeT, isHome: false, res: awayRes, score: `${g.as}-${g.hs}`, status: "F" };
+        } else {
+          byTeam[g.home] = { opp: awayT, isHome: true, time: g.matchTime, status: g.status };
+          byTeam[g.away] = { opp: homeT, isHome: false, time: g.matchTime, status: g.status };
+        }
+      });
+      const cells = TEAMS.map(t => {
+        const e = byTeam[t.id]; if (!e) return `<td style="color:var(--ink-4);">—</td>`;
+        if (e.status === "F") {
+          const resCls = e.res === "승" ? "W" : e.res === "패" ? "L" : "D";
+          return `<td><div style="font-size:10px;color:var(--ink-4);font-weight:600;">${e.isHome ? "🏠" : "✈️"} vs ${e.opp.key}</div><div class="gm-result ${resCls}">${e.res} <span class="mono" style="font-size:10px;color:var(--ink-3);">${e.score}</span></div></td>`;
+        }
+        return `<td><div style="font-size:10px;color:var(--ink-4);font-weight:600;">${e.isHome ? "🏠" : "✈️"} vs ${e.opp.key}</div><div><span class="gm-sched">예정</span> <span class="gm-time">${e.time || ""}</span></div></td>`;
+      }).join("");
+      const isPast = d < todayYMD();
+      return `<tr><td style="text-align:left;font-weight:600;color:${isPast ? "var(--ink-1)" : "var(--accent)"};">${ymdHuman(d)}<span style="color:var(--ink-4);font-weight:500;"> (${weekdayOf(d)})</span></td>${cells}</tr>`;
+    }).join("");
+    tbl.innerHTML = head + `<tbody>${body}</tbody>`;
+  } else {
+    const games = STORE.byTeam[selectedTeamId].slice()
+      .filter(g => datesSorted.includes(g.date))
+      .sort((a,b)=> a.date.localeCompare(b.date));
+    const head = `<thead><tr><th>#</th><th>날짜</th><th>요일</th><th>구분</th><th>상대</th><th>결과</th><th>스코어</th><th>경기장</th></tr></thead>`;
+    let n = 0;
+    const body = games.map(g => {
+      const opp = TEAM_BY_ID[g.opp];
+      if (g.status === "F") {
+        n++;
+        const resTxt = g.result === "W" ? "승" : g.result === "L" ? "패" : "무";
+        return `<tr>
+          <td class="mono">${n}</td>
+          <td>${ymdHuman(g.date)}</td>
+          <td>${weekdayOf(g.date)}</td>
+          <td>${g.isHome ? "🏠 홈" : "✈️ 원정"}</td>
+          <td class="team-cell">${teamPill(opp)}</td>
+          <td class="gm-result ${g.result}">${resTxt}</td>
+          <td class="mono">${g.score} - ${g.oppScore}</td>
+          <td>${g.arenaName || g.arena || "-"}</td>
+        </tr>`;
+      }
+      return `<tr style="background:rgba(0,0,0,0.015);">
+        <td class="mono" style="color:var(--ink-4);">—</td>
+        <td style="color:var(--accent);font-weight:600;">${ymdHuman(g.date)}</td>
+        <td>${weekdayOf(g.date)}</td>
+        <td>${g.isHome ? "🏠 홈" : "✈️ 원정"}</td>
+        <td class="team-cell">${teamPill(opp)}</td>
+        <td><span class="gm-sched">예정</span></td>
+        <td class="gm-time">${g.matchTime || ""}</td>
+        <td>${g.arenaName || g.arena || "-"}</td>
+      </tr>`;
+    }).join("");
+    tbl.innerHTML = head + `<tbody>${body}</tbody>`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 7) 게임별 연속 기록
+// ─────────────────────────────────────────────────────────────────
+function renderGameRecords() {
+  const streakByTeam = {};
+  TEAMS.forEach(t => {
+    const games = STORE.byTeam[t.id].filter(g => g.status === "F")
+      .sort((a,b)=> a.date.localeCompare(b.date));
+    const out = []; let cur = "", n = 0;
+    for (const g of games) {
+      if (g.result === "D") { cur = "D"; n = 0; out.push({ label: "무", cls: "D" }); continue; }
+      if (g.result === cur) n++; else { cur = g.result; n = 1; }
+      out.push({ label: `${n}${g.result === "W" ? "승" : "패"}`, cls: g.result });
+    }
+    streakByTeam[t.id] = out;
+  });
+  const maxLen = Math.max(...TEAMS.map(t => streakByTeam[t.id].length));
+  const head = `<thead><tr><th>경기 #</th>${TEAMS.map(t => `<th>${teamPill(t, 18)}</th>`).join("")}</tr></thead>`;
+  let body = "";
+  for (let i = 0; i < maxLen; i++) {
+    body += `<tr><td class="mono"><b>${i+1}</b></td>${TEAMS.map(t => {
+      const e = streakByTeam[t.id][i];
+      if (!e) return `<td style="color:var(--ink-4);">—</td>`;
+      return `<td class="streak-${e.cls === "W" ? "W" : e.cls === "L" ? "L" : "D"}">${e.label}</td>`;
+    }).join("")}</tr>`;
+  }
+  document.getElementById("gameRecordsTable").innerHTML = head + `<tbody>${body}</tbody>`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 8) 상대전적 매트릭스 (3단 셀 + 컬러 티어)
+// ─────────────────────────────────────────────────────────────────
+function rateTier(W, L) {
+  const T = W + L;
+  if (T === 0) return "";
+  const r = W / T;
+  if (r > 0.5) return "rate-good";
+  if (r < 0.5) return "rate-bad";
+  return "rate-mid";
+}
+function renderMatrix() {
+  // 홈/원정 분리 집계
+  const h2h = {};
+  TEAMS.forEach(t => { h2h[t.id] = {}; TEAMS.forEach(u => { h2h[t.id][u.id] = { home:{W:0,L:0,D:0}, away:{W:0,L:0,D:0} }; }); });
+  STORE.games.forEach(g => {
+    // home팀 입장: 홈 경기, away팀 입장: 원정 경기
+    if (g.result === "W") { h2h[g.home][g.away].home.W++; h2h[g.away][g.home].away.L++; }
+    else if (g.result === "L") { h2h[g.away][g.home].away.W++; h2h[g.home][g.away].home.L++; }
+    else { h2h[g.home][g.away].home.D++; h2h[g.away][g.home].away.D++; }
+  });
+
+  const head = `<thead><tr><th>vs</th>${TEAMS.map(t => `<th>${teamPill(t, 20)}</th>`).join("")}<th>합계</th></tr></thead>`;
+  const body = TEAMS.map(rt => {
+    let tot = { W:0, L:0, D:0 };
+    const cells = TEAMS.map(ct => {
+      if (rt.id === ct.id) return `<td class="self">—</td>`;
+      const h = h2h[rt.id][ct.id].home, a = h2h[rt.id][ct.id].away;
+      const tW = h.W + a.W, tL = h.L + a.L, tD = h.D + a.D;
+      tot.W += tW; tot.L += tL; tot.D += tD;
+      const main = `${tW}-${tL}-${tD} <span style="color:var(--ink-4);font-weight:600;">(${fmtRate(tW, tL)})</span>`;
+      const hLine = `<span class="cell-sub"><span class="ic">🏠</span>${h.W}-${h.L}-${h.D} <span style="color:var(--ink-4);">(${fmtRate(h.W, h.L)})</span></span>`;
+      const aLine = `<span class="cell-sub"><span class="ic">✈️</span>${a.W}-${a.L}-${a.D} <span style="color:var(--ink-4);">(${fmtRate(a.W, a.L)})</span></span>`;
+      const tier = rateTier(tW, tL);
+      return `<td class="cell ${tier}"><span class="cell-main">${main}</span>${hLine}${aLine}</td>`;
+    }).join("");
+    const totMain = `<span class="cell-main">${tot.W}-${tot.L}-${tot.D}</span><span class="cell-sub">${fmtRate(tot.W, tot.L)}</span>`;
+    const totTier = rateTier(tot.W, tot.L);
+    return `<tr><td class="team-cell">${teamPill(rt, 20)}</td>${cells}<td class="cell ${totTier}">${totMain}</td></tr>`;
+  }).join("");
+  document.getElementById("matrixTable").innerHTML = head + `<tbody>${body}</tbody>`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 9) 잔여
+// ─────────────────────────────────────────────────────────────────
+function renderRemaining() {
+  const played = {};
+  TEAMS.forEach(t => { played[t.id] = {}; TEAMS.forEach(u => played[t.id][u.id] = 0); });
+  STORE.games.forEach(g => { played[g.home][g.away]++; played[g.away][g.home]++; });
+  const head = `<thead><tr><th>vs</th>${TEAMS.map(t => `<th>${teamPill(t, 20)}</th>`).join("")}<th>총 잔여</th></tr></thead>`;
+  const body = TEAMS.map(rt => {
+    let total = 0;
+    const cells = TEAMS.map(ct => {
+      if (rt.id === ct.id) return `<td class="self">—</td>`;
+      const rem = KBO_VS_GAMES - (played[rt.id][ct.id] || 0); total += rem;
+      const intensity = Math.min(0.45, rem / KBO_VS_GAMES * 0.45);
+      return `<td class="cell" style="background:rgba(220,38,38,${intensity})"><span class="cell-main">${rem}</span></td>`;
+    }).join("");
+    return `<tr><td class="team-cell">${teamPill(rt, 20)}</td>${cells}<td class="cell"><span class="cell-main">${total}</span></td></tr>`;
+  }).join("");
+  document.getElementById("remainingTable").innerHTML = head + `<tbody>${body}</tbody>`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 10) 홈/원정
+// ─────────────────────────────────────────────────────────────────
+function renderHomeAway() {
+  const rows = TEAMS.map(t => {
+    const games = STORE.byTeam[t.id].filter(g => g.status === "F");
+    const home = { W:0, L:0, D:0 }, away = { W:0, L:0, D:0 };
+    games.forEach(g => (g.isHome ? home : away)[g.result]++);
+    const hr = fmtRate(home.W, home.L), ar = fmtRate(away.W, away.L);
+    const diff = parseFloat(hr) - parseFloat(ar);
+    return { t, home, away, hr, ar, diff };
+  }).sort((a,b)=> b.diff - a.diff);
+  const head = `<thead><tr><th>팀</th><th>홈 W-L-D</th><th>홈 승률</th><th>원정 W-L-D</th><th>원정 승률</th><th>편차</th></tr></thead>`;
+  const body = rows.map(r => `
+    <tr>
+      <td class="team-cell">${teamPill(r.t)}</td>
+      <td class="mono">${r.home.W}-${r.home.L}-${r.home.D}</td>
+      <td class="mono"><b>${r.hr}</b></td>
+      <td class="mono">${r.away.W}-${r.away.L}-${r.away.D}</td>
+      <td class="mono"><b>${r.ar}</b></td>
+      <td class="mono ${r.diff > 0 ? "pos" : r.diff < 0 ? "neg" : ""}">${r.diff > 0 ? "+" : ""}${r.diff.toFixed(3)}</td>
+    </tr>`).join("");
+  document.getElementById("homeAwayTable").innerHTML = head + `<tbody>${body}</tbody>`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 11) 전반/후반기
+// ─────────────────────────────────────────────────────────────────
+function renderHalfSeason() {
+  const SPLIT = "0715";
+  const split = g => g.date.slice(4) <= SPLIT ? "전반" : "후반";
+  const stats = {}; TEAMS.forEach(t => { stats[t.id] = { 전반:{W:0,L:0,D:0}, 후반:{W:0,L:0,D:0} }; });
+  STORE.games.forEach(g => {
+    const ph = split(g);
+    if (g.result === "W") { stats[g.home][ph].W++; stats[g.away][ph].L++; }
+    else if (g.result === "L") { stats[g.away][ph].W++; stats[g.home][ph].L++; }
+    else { stats[g.home][ph].D++; stats[g.away][ph].D++; }
+  });
+  const head = `<thead><tr><th>팀</th><th>전반 W-L-D</th><th>전반 승률</th><th>후반 W-L-D</th><th>후반 승률</th></tr></thead>`;
+  const body = TEAMS.map(t => {
+    const a = stats[t.id].전반, b = stats[t.id].후반;
+    return `<tr>
+      <td class="team-cell">${teamPill(t)}</td>
+      <td class="mono">${a.W}-${a.L}-${a.D}</td>
+      <td class="mono"><b>${fmtRate(a.W, a.L)}</b></td>
+      <td class="mono">${(b.W + b.L + b.D) === 0 ? `<span style="color:var(--ink-4);">진행 전</span>` : `${b.W}-${b.L}-${b.D}`}</td>
+      <td class="mono">${(b.W + b.L) === 0 ? "—" : `<b>${fmtRate(b.W, b.L)}</b>`}</td>
+    </tr>`;
+  }).join("");
+  document.getElementById("halfSeasonTable").innerHTML = head + `<tbody>${body}</tbody>`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 12) 월/주/요일별
+// ─────────────────────────────────────────────────────────────────
+function aggregateByKey(keyFn) {
+  const out = {}; TEAMS.forEach(t => out[t.id] = {});
+  STORE.games.forEach(g => {
+    const k = keyFn(g);
+    const inc = (tid, res) => { out[tid][k] = out[tid][k] || { W:0, L:0, D:0 }; out[tid][k][res]++; };
+    if (g.result === "W") { inc(g.home, "W"); inc(g.away, "L"); }
+    else if (g.result === "L") { inc(g.away, "W"); inc(g.home, "L"); }
+    else { inc(g.home, "D"); inc(g.away, "D"); }
+  });
+  return out;
+}
+function renderMatrixOf(tableId, keyOrder, keyLabel, agg) {
+  const head = `<thead><tr><th>팀</th>${keyOrder.map(k => `<th>${keyLabel(k)}</th>`).join("")}<th>합계</th></tr></thead>`;
+  const body = TEAMS.map(t => {
+    let tot = { W:0, L:0, D:0 };
+    const cells = keyOrder.map(k => {
+      const r = agg[t.id][k] || { W:0, L:0, D:0 };
+      tot.W += r.W; tot.L += r.L; tot.D += r.D;
+      const txt = (r.W + r.L + r.D) === 0 ? `<span style="color:var(--ink-4);">—</span>` : `${r.W}-${r.L}-${r.D}`;
+      return `<td><div class="mono">${txt}</div><div class="mono" style="font-size:10px;color:var(--ink-4);">${(r.W + r.L) === 0 ? "" : fmtRate(r.W, r.L)}</div></td>`;
+    }).join("");
+    return `<tr><td class="team-cell">${teamPill(t)}</td>${cells}<td><div class="mono"><b>${tot.W}-${tot.L}-${tot.D}</b></div><div class="mono" style="font-size:10px;color:var(--ink-4);">${fmtRate(tot.W, tot.L)}</div></td></tr>`;
+  }).join("");
+  document.getElementById(tableId).innerHTML = head + `<tbody>${body}</tbody>`;
+}
+function renderMonthly() {
+  const months = []; for (let m = 3; m <= 10; m++) months.push(pad(m));
+  const present = new Set(STORE.games.map(g => g.date.slice(4, 6)));
+  const order = months.filter(m => present.has(m));
+  renderMatrixOf("monthlyTable", order, m => `${parseInt(m)}월`, aggregateByKey(g => g.date.slice(4, 6)));
+}
+function isoWeek(s) {
+  const d = new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T00:00:00`);
+  const t = new Date(d.valueOf()); t.setHours(0,0,0,0);
+  t.setDate(t.getDate() + 3 - (t.getDay() + 6) % 7);
+  const week1 = new Date(t.getFullYear(), 0, 4);
+  return 1 + Math.round(((t - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+}
+function renderWeekly() {
+  const agg = aggregateByKey(g => "W" + isoWeek(g.date));
+  const present = Array.from(new Set(STORE.games.map(g => "W" + isoWeek(g.date)))).sort((a,b)=> parseInt(a.slice(1)) - parseInt(b.slice(1)));
+  renderMatrixOf("weeklyTable", present, w => `${w.slice(1)}주`, agg);
+}
+function renderWeekday() {
+  renderMatrixOf("weekdayTable", ["월","화","수","목","금","토","일"], k => k, aggregateByKey(g => weekdayOf(g.date)));
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 13) 연승/연패
+// ─────────────────────────────────────────────────────────────────
+function renderStreaks() {
+  const rows = TEAMS.map(t => {
+    const games = STORE.byTeam[t.id].filter(g => g.status === "F").sort((a,b)=> a.date.localeCompare(b.date));
+    let maxW = 0, maxL = 0, curW = 0, curL = 0;
+    let maxWRange = ["",""], maxLRange = ["",""], curStart = "";
+    games.forEach(g => {
+      if (g.result === "W") {
+        if (curW === 0) curStart = g.date;
+        curW++; curL = 0;
+        if (curW > maxW) { maxW = curW; maxWRange = [curStart, g.date]; }
+      } else if (g.result === "L") {
+        if (curL === 0) curStart = g.date;
+        curL++; curW = 0;
+        if (curL > maxL) { maxL = curL; maxLRange = [curStart, g.date]; }
+      } else { curW = 0; curL = 0; }
+    });
+    let cur = "", n = 0;
+    for (let i = games.length - 1; i >= 0; i--) {
+      if (i === games.length - 1) { cur = games[i].result; n = 1; continue; }
+      if (games[i].result === cur) n++; else break;
+    }
+    return {
+      t, maxW, maxL,
+      maxWLabel: maxW ? `${ymdSlash(maxWRange[0])} ~ ${ymdSlash(maxWRange[1])}` : "—",
+      maxLLabel: maxL ? `${ymdSlash(maxLRange[0])} ~ ${ymdSlash(maxLRange[1])}` : "—",
+      curLabel: n ? `${n}${cur === "W" ? "승" : cur === "L" ? "패" : "무"}` : "—",
+      curCls: cur === "W" ? "streak-W" : cur === "L" ? "streak-L" : "streak-D"
+    };
+  });
+  const head = `<thead><tr><th>팀</th><th>최장 연승</th><th>기간</th><th>최장 연패</th><th>기간</th><th>현재</th></tr></thead>`;
+  const body = rows.map(r => `<tr>
+    <td class="team-cell">${teamPill(r.t)}</td>
+    <td class="streak-W mono">${r.maxW}</td><td class="mono" style="color:var(--ink-3);">${r.maxWLabel}</td>
+    <td class="streak-L mono">${r.maxL}</td><td class="mono" style="color:var(--ink-3);">${r.maxLLabel}</td>
+    <td class="${r.curCls}">${r.curLabel}</td>
+  </tr>`).join("");
+  document.getElementById("streakTable").innerHTML = head + `<tbody>${body}</tbody>`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 14) 시리즈
+// ─────────────────────────────────────────────────────────────────
+function renderSeries() {
+  const sorted = STORE.games.slice().sort((a,b)=> a.date.localeCompare(b.date));
+  const series = []; const used = new Set();
+  for (let i = 0; i < sorted.length; i++) {
+    if (used.has(i)) continue;
+    const g = sorted[i];
+    const pair = [g.home, g.away].sort().join("|");
+    const group = [g]; used.add(i);
+    for (let j = i + 1; j < sorted.length; j++) {
+      if (used.has(j)) continue;
+      const gj = sorted[j];
+      const pairJ = [gj.home, gj.away].sort().join("|");
+      if (pairJ !== pair) continue;
+      const last = group[group.length - 1];
+      const diff = (dateOf(gj.date) - dateOf(last.date)) / 86400000;
+      if (diff > 3) break;
+      if (gj.arena !== g.arena) continue;
+      group.push(gj); used.add(j);
+    }
+    series.push(group);
+  }
+  series.reverse();
+  const head = `<thead><tr><th>기간</th><th>홈</th><th>원정</th><th>경기수</th><th>결과 (홈 기준)</th><th>경기장</th></tr></thead>`;
+  const body = series.map(grp => {
+    const w = grp.filter(g => g.result === "W").length;
+    const l = grp.filter(g => g.result === "L").length;
+    const d = grp.filter(g => g.result === "D").length;
+    const home = TEAM_BY_ID[grp[0].home], away = TEAM_BY_ID[grp[0].away];
+    const range = grp.length === 1 ? ymdSlash(grp[0].date) : `${ymdSlash(grp[0].date)} ~ ${ymdSlash(grp[grp.length-1].date)}`;
+    return `<tr>
+      <td class="mono">${range}</td>
+      <td class="team-cell">${teamPill(home)}</td>
+      <td class="team-cell">${teamPill(away)}</td>
+      <td class="mono">${grp.length}</td>
+      <td><span class="streak-W">${w}승</span> <span class="streak-L">${l}패</span>${d ? ` <span class="streak-D">${d}무</span>` : ""}</td>
+      <td>${grp[0].arenaName || grp[0].arena || "-"}</td>
+    </tr>`;
+  }).join("");
+  document.getElementById("seriesTable").innerHTML = head + `<tbody>${body}</tbody>`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 15) 경기장별
+// ─────────────────────────────────────────────────────────────────
+function renderStadium() {
+  const arenas = {};
+  STORE.games.forEach(g => {
+    const key = g.arena || "(미상)";
+    const a = arenas[key] = arenas[key] || { name: g.arenaName || key, games: 0, hostTeamCount: {}, total: { W:0, L:0, D:0 } };
+    a.games++; a.hostTeamCount[g.home] = (a.hostTeamCount[g.home] || 0) + 1;
+    if (g.result === "W") a.total.W++; else if (g.result === "L") a.total.L++; else a.total.D++;
+  });
+  const list = Object.entries(arenas).sort((a,b)=> b[1].games - a[1].games);
+  const head = `<thead><tr><th>경기장</th><th>주 홈팀</th><th>경기수</th><th>홈팀 W-L-D</th><th>홈 승률</th></tr></thead>`;
+  const body = list.map(([id, a]) => {
+    const topHost = Object.entries(a.hostTeamCount).sort((x,y)=> y[1] - x[1])[0];
+    const host = topHost ? TEAM_BY_ID[topHost[0]] : null;
+    return `<tr>
+      <td style="text-align:left;font-weight:600;">${a.name}</td>
+      <td class="team-cell">${host ? teamPill(host) : "—"}</td>
+      <td class="mono">${a.games}</td>
+      <td class="mono">${a.total.W}-${a.total.L}-${a.total.D}</td>
+      <td class="mono"><b>${fmtRate(a.total.W, a.total.L)}</b></td>
+    </tr>`;
+  }).join("");
+  document.getElementById("stadiumTable").innerHTML = head + `<tbody>${body}</tbody>`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 마스터
+// ─────────────────────────────────────────────────────────────────
+function renderAll() {
+  renderKPI();
+  renderSeasonProgress();
+  renderStandings();
+  initDailyControls();
+  renderDailyCharts();
+  renderTeamPicker(); renderMonthTabs(); renderTeamGames();
+  renderGameRecords();
+  renderStreaks();
+  renderHomeAway();
+  renderMatrix();
+  renderRemaining();
+  renderSeries();
+  renderHalfSeason();
+  renderMonthly(); renderWeekly(); renderWeekday();
+  renderStadium();
+}
+
+function defaultEnd() {
+  // 시즌 종료 추정: 10월 31일 (포스트시즌 별도)
+  const d = new Date();
+  const y = d.getFullYear();
+  return `${y}-10-31`;
+}
+document.getElementById("endDate").value = defaultEnd();
+preloadLogos();
+
+async function run() {
+  setErr("");
+  const startISO = document.getElementById("startDate").value;
+  const endISO = document.getElementById("endDate").value;
+  if (!startISO || !endISO) { setErr("입력값 누락"); return; }
+  try {
+    await loadAll(startISO, endISO);
+    setProgress(`완료 · ${STORE.games.length}경기 완료 + ${STORE.scheduled.length}예정`);
+    if (!STORE.games.length && !STORE.scheduled.length) { setErr("기간 내 경기 없음"); return; }
+    renderAll();
+  } catch (e) {
+    setErr(String(e)); setProgress("실패");
+  }
+}
+
+document.getElementById("reload").onclick = run;
+document.getElementById("clearCache").onclick = () => {
+  let n = 0;
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(CACHE_PREFIX)) { localStorage.removeItem(k); n++; }
+  }
+  setProgress(`캐시 ${n}건 삭제`);
+};
+
+// ─────────────────────────────────────────────────────────────────
+// SPA 라우팅
+// ─────────────────────────────────────────────────────────────────
+function showSection(target) {
+  const body = document.body;
+  const navLinks = document.querySelectorAll(".nav [data-nav]");
+  if (!target || target === "all" || target === "") {
+    body.classList.remove("spa-single");
+    document.querySelectorAll("main > [data-section]").forEach(el => el.classList.remove("active"));
+    navLinks.forEach(a => a.classList.toggle("active", a.dataset.nav === "all"));
+  } else {
+    body.classList.add("spa-single");
+    document.querySelectorAll("main > [data-section]").forEach(el => {
+      el.classList.toggle("active", el.dataset.section === target);
+    });
+    navLinks.forEach(a => a.classList.toggle("active", a.dataset.nav === target));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    // 차트 단일 모드 진입 시 리사이즈 트리거
+    setTimeout(() => Object.values(CHARTS).forEach(c => c.resize()), 100);
+  }
+}
+
+function handleHash() {
+  const hash = location.hash.slice(1);
+  showSection(hash);
+}
+
+document.querySelectorAll(".nav [data-nav]").forEach(a => {
+  a.addEventListener("click", e => {
+    e.preventDefault();
+    const nav = a.dataset.nav;
+    if (nav === "all") {
+      history.pushState({}, "", "#");
+      showSection("all");
+    } else {
+      history.pushState({}, "", "#" + nav);
+      showSection(nav);
+    }
+  });
+});
+
+window.addEventListener("popstate", handleHash);
+window.addEventListener("hashchange", handleHash);
+
+// 초기 라우팅
+handleHash();
+
+run();
+</script>
+</body>
+</html>
